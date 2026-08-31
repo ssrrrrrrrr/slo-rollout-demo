@@ -754,46 +754,11 @@ func (svc *ExecutionService) resolveReleaseEvidenceFile(releaseID string) (strin
 }
 
 func (svc *ExecutionService) findLatestReportFile(pattern string, latestName string) (string, error) {
-	latestFile := filepath.Join(svc.cfg.ReportDir, latestName)
-	if info, err := os.Stat(latestFile); err == nil && !info.IsDir() {
-		return latestFile, nil
-	}
-
-	matches, err := filepath.Glob(filepath.Join(svc.cfg.ReportDir, pattern))
-	if err != nil {
-		return "", fmt.Errorf("glob report files %s: %w", pattern, err)
-	}
-
-	type candidate struct {
-		path string
-		mod  time.Time
-	}
-
-	var latest candidate
-	found := false
-
-	for _, match := range matches {
-		base := filepath.Base(match)
-		if strings.Contains(base, "-latest.") {
-			continue
-		}
-
-		info, err := os.Stat(match)
-		if err != nil || info.IsDir() {
-			continue
-		}
-
-		if !found || info.ModTime().After(latest.mod) {
-			found = true
-			latest = candidate{path: match, mod: info.ModTime()}
-		}
-	}
-
+	path, _, found := NewArtifactLocator(svc.cfg.ReportDir).Resolve([]string{latestName}, pattern)
 	if !found {
 		return "", fmt.Errorf("no report files found for pattern %s", pattern)
 	}
-
-	return latest.path, nil
+	return path, nil
 }
 
 func (svc *ExecutionService) readJSONFile(path string) map[string]interface{} {

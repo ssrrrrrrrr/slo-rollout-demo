@@ -6,7 +6,6 @@
   GitBranch,
   LockKeyhole,
   Network,
-  Settings,
   ShieldCheck,
   Siren,
 } from "lucide-react"
@@ -15,17 +14,6 @@ import {
   workspaceRoutes,
   type PortalRoute,
 } from "@/components/layout/portalRoutes"
-
-const systemItems = [
-  {
-    label: "Environments",
-    icon: Database,
-  },
-  {
-    label: "Settings",
-    icon: Settings,
-  },
-]
 
 const routeIcon: Record<PortalRoute, typeof ShieldCheck> = {
   Overview: Activity,
@@ -149,30 +137,7 @@ export function SidebarNavigation({
         </div>
 
         <div className="mt-auto">
-          <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-            System
-          </p>
-
-          <div className="mt-2 space-y-1">
-            {systemItems.map((item) => {
-              const Icon = item.icon
-
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left text-slate-500 transition hover:bg-[#0d1623] hover:text-slate-300"
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate text-sm font-semibold">
-                    {item.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-4 rounded-xl border border-[#1f2b3d] bg-[#0b121d] px-3 py-3">
+          <div className="rounded-xl border border-[#1f2b3d] bg-[#0b121d] px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-slate-300">

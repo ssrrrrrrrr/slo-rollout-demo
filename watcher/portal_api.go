@@ -1776,52 +1776,7 @@ func (api *portalAPI) resourceStatus(def portalResourceDef) portalResourceStatus
 }
 
 func (api *portalAPI) findResourceFile(def portalResourceDef) (string, os.FileInfo, bool) {
-	for _, candidate := range def.Candidates {
-		path := filepath.Join(api.reportDir, candidate)
-		info, err := os.Stat(path)
-		if err == nil && !info.IsDir() {
-			return path, info, true
-		}
-	}
-
-	if def.FallbackGlob == "" {
-		return "", nil, false
-	}
-
-	matches, err := filepath.Glob(filepath.Join(api.reportDir, def.FallbackGlob))
-	if err != nil {
-		return "", nil, false
-	}
-
-	type candidateFile struct {
-		path string
-		info os.FileInfo
-	}
-
-	candidates := []candidateFile{}
-	for _, path := range matches {
-		base := filepath.Base(path)
-		if strings.Contains(base, "-latest.") {
-			continue
-		}
-
-		info, err := os.Stat(path)
-		if err != nil || info.IsDir() {
-			continue
-		}
-
-		candidates = append(candidates, candidateFile{path: path, info: info})
-	}
-
-	if len(candidates) == 0 {
-		return "", nil, false
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].info.ModTime().After(candidates[j].info.ModTime())
-	})
-
-	return candidates[0].path, candidates[0].info, true
+	return NewArtifactLocator(api.reportDir).Resolve(def.Candidates, def.FallbackGlob)
 }
 
 func (api *portalAPI) requireGET(w http.ResponseWriter, r *http.Request) bool {
