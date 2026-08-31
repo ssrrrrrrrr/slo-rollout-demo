@@ -55,7 +55,6 @@
     "reliability": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sloRef"],
       "properties": { "sloRef": { "type": "string", "minLength": 1 } }
     },
     "delivery": {

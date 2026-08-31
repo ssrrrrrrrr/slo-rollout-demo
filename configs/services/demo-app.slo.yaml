@@ -11,6 +11,9 @@ metadata:
 spec:
   description: "Default canary release SLO for demo-app."
   owner: sre
+  serviceLevel:
+    window: 30d
+    availabilityTarget: 99.9
   runtime:
     image:
       repository: sre/demo-app

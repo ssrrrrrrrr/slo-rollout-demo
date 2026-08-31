@@ -46,6 +46,7 @@ type Config struct {
 	EvidenceStoreRefreshStateFile string `yaml:"evidenceStoreRefreshStateFile"`
 	OllamaURL                     string `yaml:"ollamaUrl"`
 	Model                         string `yaml:"model"`
+	PrometheusURL                 string `yaml:"prometheusUrl"`
 	HealthAddr                    string `yaml:"healthAddr"`
 }
 
@@ -94,6 +95,7 @@ func defaultConfig() Config {
 		EvidenceStorePython: "python3",
 		OllamaURL:           "http://192.168.30.1:11434",
 		Model:               "qwen2.5:0.5b",
+		PrometheusURL:       "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
 		HealthAddr:          ":8080",
 		Targets: []Target{
 			{
@@ -154,6 +156,9 @@ func loadConfig(path string) (Config, error) {
 	}
 	if cfg.Model == "" {
 		cfg.Model = def.Model
+	}
+	if cfg.PrometheusURL == "" {
+		cfg.PrometheusURL = def.PrometheusURL
 	}
 	if cfg.HealthAddr == "" {
 		cfg.HealthAddr = def.HealthAddr

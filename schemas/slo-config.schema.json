@@ -75,6 +75,25 @@
         "owner": {
           "type": "string"
         },
+        "serviceLevel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "window",
+            "availabilityTarget"
+          ],
+          "properties": {
+            "window": {
+              "type": "string",
+              "pattern": "^[0-9]+[smhd]$"
+            },
+            "availabilityTarget": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            }
+          }
+        },
         "evaluation": {
           "type": "object",
           "additionalProperties": false,

@@ -52,14 +52,19 @@ func (api *portalAPI) handleServiceDetail(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	name, releases, ok := serviceRoute(r.URL.Path)
+	name, resource, ok := serviceRoute(r.URL.Path)
 	if !ok {
 		writePortalJSON(w, http.StatusNotFound, map[string]string{"error": "service not found"})
 		return
 	}
 
 	serviceSvc := api.serviceService()
-	if releases {
+	if resource == "slo" {
+		api.handleServiceSLO(w, r, name)
+		return
+	}
+
+	if resource == "releases" {
 		items, err := serviceSvc.Releases(r, name)
 		if err != nil {
 			api.writeServiceError(w, err)
@@ -104,19 +109,19 @@ func (api *portalAPI) writeServiceError(w http.ResponseWriter, err error) {
 	})
 }
 
-func serviceRoute(path string) (name string, releases bool, ok bool) {
+func serviceRoute(path string) (name string, resource string, ok bool) {
 	rest := strings.Trim(strings.TrimPrefix(path, "/api/v1/services/"), "/")
 	if rest == "" {
-		return "", false, false
+		return "", "", false
 	}
 
 	parts := strings.Split(rest, "/")
 	if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" {
-		return parts[0], false, true
+		return parts[0], "", true
 	}
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "releases" {
-		return parts[0], true, true
+	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && (parts[1] == "releases" || parts[1] == "slo") {
+		return parts[0], parts[1], true
 	}
 
-	return "", false, false
+	return "", "", false
 }

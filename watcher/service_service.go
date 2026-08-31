@@ -182,8 +182,8 @@ func validateService(service Service) error {
 	if len(service.Environments) == 0 || strings.TrimSpace(service.Runtime.Namespace) == "" || strings.TrimSpace(service.Runtime.Workload.Kind) == "" || strings.TrimSpace(service.Runtime.Workload.Name) == "" {
 		return fmt.Errorf("environments and runtime reference are required")
 	}
-	if strings.TrimSpace(service.Reliability.SLORef) == "" || strings.TrimSpace(service.Delivery.StrategyRef) == "" {
-		return fmt.Errorf("reliability.sloRef and delivery.strategyRef are required")
+	if strings.TrimSpace(service.Delivery.StrategyRef) == "" {
+		return fmt.Errorf("delivery.strategyRef is required")
 	}
 
 	return nil

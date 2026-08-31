@@ -19,6 +19,7 @@ data:
     evidenceStoreRefreshStateFile: /app/docs/release-reports/evidence-store/portal-evidence-store-refresh.json
     ollamaUrl: http://192.168.30.1:11434
     model: qwen2.5:0.5b
+    prometheusUrl: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
 
     targets:
       - namespace: slo-rollout
