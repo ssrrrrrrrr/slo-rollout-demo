@@ -46,10 +46,19 @@ func (api *portalAPI) handleIncidentList(w http.ResponseWriter, r *http.Request)
 }
 
 func (api *portalAPI) handleIncidentDetail(w http.ResponseWriter, r *http.Request) {
+	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/incidents/"), "/")
+	parts := strings.Split(rest, "/")
+	if len(parts) >= 2 && parts[0] != "" && parts[1] == "remediation" {
+		resource := strings.Join(parts[1:], "/")
+		if resource == "remediation" || resource == "remediation/preview" || resource == "remediation/execute" || resource == "remediation/verification" {
+			api.handleIncidentRemediation(w, r, parts[0], resource)
+			return
+		}
+	}
 	if !api.requireGET(w, r) {
 		return
 	}
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/incidents/"), "/")
+	id := rest
 	if id == "" || strings.Contains(id, "/") {
 		api.writeIncidentError(w, &IncidentNotFoundError{ID: id})
 		return

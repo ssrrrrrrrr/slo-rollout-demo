@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react"
 import { KeyValueRows } from "@/components/common/KeyValueRows"
 import { Panel } from "@/components/common/Panel"
+import { IncidentRemediationPanel } from "@/components/incident/IncidentRemediationPanel"
 import type { ReliabilityIncident } from "@/types/incident"
 import { formatTime } from "@/utils/format"
 
@@ -72,6 +73,8 @@ export function IncidentDetailPage({ incident, onOpenRelease }: { incident: Reli
           <div className="mt-4"><KeyValueRows rows={[["Recommendation", incident.recommendation ? `${incident.recommendation.action} (${incident.recommendation.source})` : "not available"], ["Policy decision", incident.releaseEvidence?.policyDecision || "not available"], ["Final action", incident.releaseEvidence?.finalAction || "not available"]]} /></div>
         </Panel>
       ) : null}
+
+      <IncidentRemediationPanel incidentId={incident.id} />
 
       <Panel>
         <h4 className="text-sm font-semibold text-slate-100">Timeline</h4>

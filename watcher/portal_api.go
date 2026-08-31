@@ -11,14 +11,15 @@ import (
 )
 
 type portalAPI struct {
-	cfg          Config
-	reportDir    string
-	executionSvc *ExecutionService
-	serviceSvc   *ServiceService
-	sloSvc       *SLOService
-	runtimeSvc   *RuntimeService
-	incidentSvc  *IncidentService
-	overviewSvc  *OverviewService
+	cfg            Config
+	reportDir      string
+	executionSvc   *ExecutionService
+	serviceSvc     *ServiceService
+	sloSvc         *SLOService
+	runtimeSvc     *RuntimeService
+	incidentSvc    *IncidentService
+	remediationSvc *RemediationService
+	overviewSvc    *OverviewService
 }
 
 type portalResourceDef struct {

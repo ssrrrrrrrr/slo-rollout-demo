@@ -68,6 +68,10 @@ func (svc *IncidentService) IsCurrentReleaseFailure(release *ServiceReleaseSumma
 	return svc.detector.IsCurrentReleaseFailure(release)
 }
 
+func (svc *IncidentService) IsCurrentRelease(release *ServiceReleaseSummary) bool {
+	return svc.detector.IsCurrentRelease(release)
+}
+
 func (svc *IncidentService) List(ctx context.Context, r *http.Request) ([]ReliabilityIncident, error) {
 	services, err := svc.serviceService.Load()
 	if err != nil {

@@ -17,6 +17,7 @@ type IncidentDetectionInput struct {
 type IncidentDetector interface {
 	Detect(input IncidentDetectionInput) *ReliabilityIncident
 	IsCurrentReleaseFailure(release *ServiceReleaseSummary) bool
+	IsCurrentRelease(release *ServiceReleaseSummary) bool
 }
 
 // DefaultIncidentReleaseFreshnessWindow keeps Release-only incidents bounded to
@@ -154,15 +155,23 @@ func incidentSeverity(input IncidentDetectionInput, releaseFailureActive bool) I
 // Release evidence. Consumers may retain stale Release data as correlation,
 // but only this helper permits it to affect current reliability state.
 func (detector *ReliabilityIncidentDetector) IsCurrentReleaseFailure(release *ServiceReleaseSummary) bool {
+	return isReleaseFailure(releaseStatus(release)) && detector.IsCurrentRelease(release)
+}
+
+func (detector *ReliabilityIncidentDetector) IsCurrentRelease(release *ServiceReleaseSummary) bool {
 	now := time.Now
 	if detector.now != nil {
 		now = detector.now
 	}
-	return isCurrentReleaseFailure(release, now(), detector.releaseFreshnessWindow)
+	return isCurrentRelease(release, now(), detector.releaseFreshnessWindow)
 }
 
 func isCurrentReleaseFailure(release *ServiceReleaseSummary, now time.Time, freshnessWindow time.Duration) bool {
-	if release == nil || !isReleaseFailure(release.Status) || strings.TrimSpace(release.Timestamp) == "" {
+	return isReleaseFailure(releaseStatus(release)) && isCurrentRelease(release, now, freshnessWindow)
+}
+
+func isCurrentRelease(release *ServiceReleaseSummary, now time.Time, freshnessWindow time.Duration) bool {
+	if release == nil || strings.TrimSpace(release.Timestamp) == "" {
 		return false
 	}
 	timestamp, err := time.Parse(time.RFC3339, release.Timestamp)
@@ -171,6 +180,13 @@ func isCurrentReleaseFailure(release *ServiceReleaseSummary, now time.Time, fres
 	}
 	age := now.Sub(timestamp)
 	return age >= 0 && age <= freshnessWindow
+}
+
+func releaseStatus(release *ServiceReleaseSummary) string {
+	if release == nil {
+		return ""
+	}
+	return release.Status
 }
 
 func deterministicIncidentID(key string) string {
