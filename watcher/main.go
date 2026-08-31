@@ -35,19 +35,20 @@ type Config struct {
 	Rollout   string   `yaml:"rollout"`
 	Targets   []Target `yaml:"targets"`
 
-	Interval                      string `yaml:"interval"`
-	Mode                          string `yaml:"mode"`
-	RepoDir                       string `yaml:"repoDir"`
-	ReportDir                     string `yaml:"reportDir"`
-	StateFile                     string `yaml:"stateFile"`
-	EvidenceStoreDB               string `yaml:"evidenceStoreDB"`
-	EvidenceStoreScriptFile       string `yaml:"evidenceStoreScriptFile"`
-	EvidenceStorePython           string `yaml:"evidenceStorePython"`
-	EvidenceStoreRefreshStateFile string `yaml:"evidenceStoreRefreshStateFile"`
-	OllamaURL                     string `yaml:"ollamaUrl"`
-	Model                         string `yaml:"model"`
-	PrometheusURL                 string `yaml:"prometheusUrl"`
-	HealthAddr                    string `yaml:"healthAddr"`
+	Interval                       string `yaml:"interval"`
+	Mode                           string `yaml:"mode"`
+	RepoDir                        string `yaml:"repoDir"`
+	ReportDir                      string `yaml:"reportDir"`
+	StateFile                      string `yaml:"stateFile"`
+	EvidenceStoreDB                string `yaml:"evidenceStoreDB"`
+	EvidenceStoreScriptFile        string `yaml:"evidenceStoreScriptFile"`
+	EvidenceStorePython            string `yaml:"evidenceStorePython"`
+	EvidenceStoreRefreshStateFile  string `yaml:"evidenceStoreRefreshStateFile"`
+	OllamaURL                      string `yaml:"ollamaUrl"`
+	Model                          string `yaml:"model"`
+	PrometheusURL                  string `yaml:"prometheusUrl"`
+	IncidentReleaseFreshnessWindow string `yaml:"incidentReleaseFreshnessWindow"`
+	HealthAddr                     string `yaml:"healthAddr"`
 }
 
 type WatchEvent struct {
@@ -89,14 +90,15 @@ var (
 
 func defaultConfig() Config {
 	return Config{
-		Interval:            "10s",
-		RepoDir:             "/root/slo-rollout-demo",
-		StateFile:           "/root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json",
-		EvidenceStorePython: "python3",
-		OllamaURL:           "http://192.168.30.1:11434",
-		Model:               "qwen2.5:0.5b",
-		PrometheusURL:       "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
-		HealthAddr:          ":8080",
+		Interval:                       "10s",
+		RepoDir:                        "/root/slo-rollout-demo",
+		StateFile:                      "/root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json",
+		EvidenceStorePython:            "python3",
+		OllamaURL:                      "http://192.168.30.1:11434",
+		Model:                          "qwen2.5:0.5b",
+		PrometheusURL:                  "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
+		IncidentReleaseFreshnessWindow: DefaultIncidentReleaseFreshnessWindowText,
+		HealthAddr:                     ":8080",
 		Targets: []Target{
 			{
 				Namespace: "slo-rollout",
@@ -159,6 +161,9 @@ func loadConfig(path string) (Config, error) {
 	}
 	if cfg.PrometheusURL == "" {
 		cfg.PrometheusURL = def.PrometheusURL
+	}
+	if cfg.IncidentReleaseFreshnessWindow == "" {
+		cfg.IncidentReleaseFreshnessWindow = def.IncidentReleaseFreshnessWindow
 	}
 	if cfg.HealthAddr == "" {
 		cfg.HealthAddr = def.HealthAddr

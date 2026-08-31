@@ -67,6 +67,14 @@ func (api *portalAPI) handleServiceDetail(w http.ResponseWriter, r *http.Request
 		api.handleServiceRuntime(w, r, name)
 		return
 	}
+	if resource == "incidents" {
+		api.handleServiceIncidents(w, r, name)
+		return
+	}
+	if resource == "incidents/active" {
+		api.handleServiceActiveIncident(w, r, name)
+		return
+	}
 
 	if resource == "releases" {
 		items, err := serviceSvc.Releases(r, name)
@@ -123,8 +131,11 @@ func serviceRoute(path string) (name string, resource string, ok bool) {
 	if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" {
 		return parts[0], "", true
 	}
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && (parts[1] == "releases" || parts[1] == "slo" || parts[1] == "runtime") {
+	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && (parts[1] == "releases" || parts[1] == "slo" || parts[1] == "runtime" || parts[1] == "incidents") {
 		return parts[0], parts[1], true
+	}
+	if len(parts) == 3 && strings.TrimSpace(parts[0]) != "" && parts[1] == "incidents" && parts[2] == "active" {
+		return parts[0], "incidents/active", true
 	}
 
 	return "", "", false

@@ -27,6 +27,15 @@
     pageDescription: "查看发布历史、选中发布详情、资源摘要、时间线、Runbook、RCA 和原始审计内容。",
   },
   {
+    id: "Incidents",
+    title: "Incidents",
+    description: "service reliability events",
+    group: "Platform",
+    eyebrow: "Incidents",
+    pageTitle: "Reliability Incidents",
+    pageDescription: "关联 SLO、Runtime 和已有 Release Evidence 的实时可靠性事件。",
+  },
+  {
     id: "Evidence",
     title: "Evidence",
     description: "EvidenceStore 检索与对象详情",

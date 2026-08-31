@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { fetchLatestRelease, fetchReleases } from "@/api/releases"
 import { fetchServices } from "@/api/services"
+import { fetchIncidents } from "@/api/incidents"
 import {
   fetchReleaseResource,
   getResourceKindByTab,
@@ -10,12 +11,14 @@ import { LayoutShell } from "@/components/layout/LayoutShell"
 import { PortalRouteRenderer } from "@/components/layout/PortalRouteRenderer"
 import { PortalState } from "@/components/layout/PortalState"
 import { ServicesPage } from "@/components/service/ServicesPage"
+import { IncidentsPage } from "@/components/incident/IncidentsPage"
 import {
   defaultPortalRoute,
   type PortalRoute,
 } from "@/components/layout/portalRoutes"
 import type { ReleaseContext } from "@/components/layout/ReleaseContextBar"
 import type { ServiceSummary } from "@/types/service"
+import type { ReliabilityIncident } from "@/types/incident"
 
 
 function displayValue(value: unknown, fallback = "unknown") {
@@ -33,6 +36,7 @@ function displayValue(value: unknown, fallback = "unknown") {
 function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedServiceName, setSelectedServiceName] = useState<string | null>(null)
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("概览")
   const [activeRoute, setActiveRoute] = useState<PortalRoute>(defaultPortalRoute)
 
@@ -54,12 +58,21 @@ function App() {
     refetchInterval: 15000,
   })
 
+  const incidentsQuery = useQuery({
+    queryKey: ["incidents"],
+    queryFn: fetchIncidents,
+    refetchInterval: 15000,
+  })
+
   const releases = useMemo(() => releasesQuery.data?.items ?? [], [releasesQuery.data?.items])
   const selected = releases.find((release) => release.releaseId === selectedId) ?? releases[0]
   const selectedSummary = selected?.summary
   const services = useMemo(() => servicesQuery.data?.items ?? [], [servicesQuery.data?.items])
   const selectedService = services.find((service) => service.name === selectedServiceName) ?? services[0]
+  const incidents = useMemo(() => incidentsQuery.data?.items ?? [], [incidentsQuery.data?.items])
+  const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? incidents[0]
   const isServicesRoute = activeRoute === "Services"
+  const isIncidentsRoute = activeRoute === "Incidents"
   const resourceKind = getResourceKindByTab(activeTab)
 
   const releaseContext = useMemo<ReleaseContext>(() => {
@@ -75,6 +88,18 @@ function App() {
       }
     }
 
+    if (isIncidentsRoute) {
+      const incident = selectedIncident as ReliabilityIncident | undefined
+      return {
+        service: incident?.service ?? "no incident",
+        environment: "service reliability",
+        releaseId: incident?.relatedRelease?.id ?? "no related release",
+        version: "not reported",
+        result: incident ? `${incident.severity} ${incident.status}` : "no active incident",
+        imageDigest: "not reported",
+      }
+    }
+
     const release = selected as Record<string, unknown> | undefined
     const summary = selectedSummary as Record<string, unknown> | undefined
 
@@ -86,7 +111,7 @@ function App() {
       result: displayValue(summary?.releaseResult ?? summary?.result ?? release?.result, "unknown"),
       imageDigest: displayValue(summary?.imageDigest ?? release?.imageDigest ?? release?.digest, "not reported"),
     }
-  }, [isServicesRoute, selected, selectedService, selectedSummary])
+  }, [isIncidentsRoute, isServicesRoute, selected, selectedIncident, selectedService, selectedSummary])
 
   const resourceQuery = useQuery({
     queryKey: ["release-resource", selected?.releaseId, resourceKind],
@@ -104,15 +129,20 @@ function App() {
 
   const isLoading = isServicesRoute
     ? servicesQuery.isLoading
-    : releasesQuery.isLoading || latestQuery.isLoading
+    : isIncidentsRoute
+      ? incidentsQuery.isLoading
+      : releasesQuery.isLoading || latestQuery.isLoading
   const hasError = isServicesRoute
     ? servicesQuery.isError
-    : releasesQuery.isError || latestQuery.isError
+    : isIncidentsRoute
+      ? incidentsQuery.isError
+      : releasesQuery.isError || latestQuery.isError
 
   function refreshAll() {
     void releasesQuery.refetch()
     void latestQuery.refetch()
     void servicesQuery.refetch()
+    void incidentsQuery.refetch()
     void environmentEvidenceQuery.refetch()
   }
 
@@ -120,7 +150,7 @@ function App() {
     <LayoutShell
       hasError={hasError}
       latest={latestQuery.data}
-      generatedAt={isServicesRoute ? servicesQuery.data?.generatedAt : releasesQuery.data?.generatedAt}
+      generatedAt={isServicesRoute ? servicesQuery.data?.generatedAt : isIncidentsRoute ? incidentsQuery.data?.generatedAt : releasesQuery.data?.generatedAt}
       activeRoute={activeRoute}
       onRouteChange={setActiveRoute}
       releaseContext={releaseContext}
@@ -135,6 +165,20 @@ function App() {
           services={services}
           selected={selectedService}
           onSelect={setSelectedServiceName}
+          onOpenRelease={(releaseId) => {
+            setSelectedId(releaseId)
+            setActiveRoute("Releases")
+          }}
+          onOpenIncident={(incidentId) => {
+            setSelectedIncidentId(incidentId)
+            setActiveRoute("Incidents")
+          }}
+        />
+      ) : isIncidentsRoute ? (
+        <IncidentsPage
+          incidents={incidents}
+          selected={selectedIncident}
+          onSelect={setSelectedIncidentId}
           onOpenRelease={(releaseId) => {
             setSelectedId(releaseId)
             setActiveRoute("Releases")

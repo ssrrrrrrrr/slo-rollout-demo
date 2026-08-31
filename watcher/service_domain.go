@@ -44,9 +44,11 @@ type ServiceDeliveryRef struct {
 }
 
 type ServiceReleaseSummary struct {
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	Timestamp string `json:"timestamp"`
+	ID             string `json:"id"`
+	Status         string `json:"status"`
+	Timestamp      string `json:"timestamp"`
+	PolicyDecision string `json:"policyDecision,omitempty"`
+	FinalAction    string `json:"finalAction,omitempty"`
 }
 
 type ServiceSummary struct {

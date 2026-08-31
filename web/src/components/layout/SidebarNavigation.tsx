@@ -8,6 +8,7 @@
   Network,
   Settings,
   ShieldCheck,
+  Siren,
 } from "lucide-react"
 import {
   platformRoutes,
@@ -30,6 +31,7 @@ const routeIcon: Record<PortalRoute, typeof ShieldCheck> = {
   Overview: Activity,
   Services: Network,
   Releases: GitBranch,
+  Incidents: Siren,
   Evidence: Database,
   Policy: ShieldCheck,
   "Supply Chain": LockKeyhole,

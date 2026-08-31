@@ -157,9 +157,11 @@ func (svc *ServiceService) releases(r *http.Request, serviceName, limit string) 
 		}
 
 		releases = append(releases, ServiceReleaseSummary{
-			ID:        id,
-			Status:    firstServiceReleaseValue(item, "release_result", "final_action", "policy_decision"),
-			Timestamp: firstServiceReleaseValue(item, "generated_at", "last_seen_at", "first_seen_at"),
+			ID:             id,
+			Status:         firstServiceReleaseValue(item, "release_result", "final_action", "policy_decision"),
+			Timestamp:      firstServiceReleaseValue(item, "generated_at", "last_seen_at", "first_seen_at"),
+			PolicyDecision: firstServiceReleaseValue(item, "policy_decision"),
+			FinalAction:    firstServiceReleaseValue(item, "final_action"),
 		})
 	}
 

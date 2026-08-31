@@ -10,11 +10,13 @@ export function ServicesPage({
   selected,
   onSelect,
   onOpenRelease,
+  onOpenIncident,
 }: {
   services: ServiceSummary[]
   selected?: ServiceSummary
   onSelect: (name: string) => void
   onOpenRelease: (releaseId: string) => void
+  onOpenIncident: (incidentId: string) => void
 }) {
   return (
     <>
@@ -66,7 +68,7 @@ export function ServicesPage({
             </div>
           </aside>
 
-          {selected ? <ServiceDetailPage service={selected} onOpenRelease={onOpenRelease} /> : null}
+          {selected ? <ServiceDetailPage service={selected} onOpenRelease={onOpenRelease} onOpenIncident={onOpenIncident} /> : null}
         </div>
       )}
     </>
