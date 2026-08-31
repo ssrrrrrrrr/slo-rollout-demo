@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { fetchLatestRelease, fetchReleases } from "@/api/releases"
 import { fetchServices } from "@/api/services"
 import { fetchIncidents } from "@/api/incidents"
+import { fetchReliabilityOverview } from "@/api/overview"
 import {
   fetchReleaseResource,
   getResourceKindByTab,
@@ -12,6 +13,7 @@ import { PortalRouteRenderer } from "@/components/layout/PortalRouteRenderer"
 import { PortalState } from "@/components/layout/PortalState"
 import { ServicesPage } from "@/components/service/ServicesPage"
 import { IncidentsPage } from "@/components/incident/IncidentsPage"
+import { ReliabilityOverviewPage } from "@/components/overview/ReliabilityOverviewPage"
 import {
   defaultPortalRoute,
   type PortalRoute,
@@ -19,6 +21,7 @@ import {
 import type { ReleaseContext } from "@/components/layout/ReleaseContextBar"
 import type { ServiceSummary } from "@/types/service"
 import type { ReliabilityIncident } from "@/types/incident"
+import type { ReliabilityOverview } from "@/types/overview"
 
 
 function displayValue(value: unknown, fallback = "unknown") {
@@ -64,6 +67,12 @@ function App() {
     refetchInterval: 15000,
   })
 
+  const overviewQuery = useQuery({
+    queryKey: ["reliability-overview"],
+    queryFn: fetchReliabilityOverview,
+    refetchInterval: 15000,
+  })
+
   const releases = useMemo(() => releasesQuery.data?.items ?? [], [releasesQuery.data?.items])
   const selected = releases.find((release) => release.releaseId === selectedId) ?? releases[0]
   const selectedSummary = selected?.summary
@@ -73,6 +82,7 @@ function App() {
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? incidents[0]
   const isServicesRoute = activeRoute === "Services"
   const isIncidentsRoute = activeRoute === "Incidents"
+  const isOverviewRoute = activeRoute === "Overview"
   const resourceKind = getResourceKindByTab(activeTab)
 
   const releaseContext = useMemo<ReleaseContext>(() => {
@@ -100,6 +110,18 @@ function App() {
       }
     }
 
+    if (isOverviewRoute) {
+      const overview = overviewQuery.data as ReliabilityOverview | undefined
+      return {
+        service: `${overview?.summary.totalServices ?? 0} services`,
+        environment: "reliability fleet",
+        releaseId: "fleet overview",
+        version: "not reported",
+        result: `${overview?.summary.activeIncidents ?? 0} active incidents`,
+        imageDigest: "not reported",
+      }
+    }
+
     const release = selected as Record<string, unknown> | undefined
     const summary = selectedSummary as Record<string, unknown> | undefined
 
@@ -111,7 +133,7 @@ function App() {
       result: displayValue(summary?.releaseResult ?? summary?.result ?? release?.result, "unknown"),
       imageDigest: displayValue(summary?.imageDigest ?? release?.imageDigest ?? release?.digest, "not reported"),
     }
-  }, [isIncidentsRoute, isServicesRoute, selected, selectedIncident, selectedService, selectedSummary])
+  }, [isIncidentsRoute, isOverviewRoute, isServicesRoute, overviewQuery.data, selected, selectedIncident, selectedService, selectedSummary])
 
   const resourceQuery = useQuery({
     queryKey: ["release-resource", selected?.releaseId, resourceKind],
@@ -131,11 +153,15 @@ function App() {
     ? servicesQuery.isLoading
     : isIncidentsRoute
       ? incidentsQuery.isLoading
+      : isOverviewRoute
+        ? overviewQuery.isLoading
       : releasesQuery.isLoading || latestQuery.isLoading
   const hasError = isServicesRoute
     ? servicesQuery.isError
     : isIncidentsRoute
       ? incidentsQuery.isError
+      : isOverviewRoute
+        ? overviewQuery.isError
       : releasesQuery.isError || latestQuery.isError
 
   function refreshAll() {
@@ -143,6 +169,7 @@ function App() {
     void latestQuery.refetch()
     void servicesQuery.refetch()
     void incidentsQuery.refetch()
+    void overviewQuery.refetch()
     void environmentEvidenceQuery.refetch()
   }
 
@@ -150,7 +177,7 @@ function App() {
     <LayoutShell
       hasError={hasError}
       latest={latestQuery.data}
-      generatedAt={isServicesRoute ? servicesQuery.data?.generatedAt : isIncidentsRoute ? incidentsQuery.data?.generatedAt : releasesQuery.data?.generatedAt}
+      generatedAt={isServicesRoute ? servicesQuery.data?.generatedAt : isIncidentsRoute ? incidentsQuery.data?.generatedAt : isOverviewRoute ? overviewQuery.data?.generatedAt : releasesQuery.data?.generatedAt}
       activeRoute={activeRoute}
       onRouteChange={setActiveRoute}
       releaseContext={releaseContext}
@@ -160,6 +187,18 @@ function App() {
         <PortalState kind="loading" />
       ) : hasError ? (
         <PortalState kind="error" />
+      ) : isOverviewRoute && overviewQuery.data ? (
+        <ReliabilityOverviewPage
+          overview={overviewQuery.data}
+          onOpenService={(serviceName) => {
+            setSelectedServiceName(serviceName)
+            setActiveRoute("Services")
+          }}
+          onOpenIncident={(incidentId) => {
+            setSelectedIncidentId(incidentId)
+            setActiveRoute("Incidents")
+          }}
+        />
       ) : isServicesRoute ? (
         <ServicesPage
           services={services}

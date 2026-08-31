@@ -50,12 +50,22 @@ func (svc *IncidentService) ActiveForService(ctx context.Context, r *http.Reques
 		latestRelease, _ = svc.serviceService.latestRelease(r, serviceName)
 	}
 
-	return svc.detector.Detect(IncidentDetectionInput{
+	return svc.Detect(IncidentDetectionInput{
 		Service:       service,
 		SLO:           slo,
 		Runtime:       runtime,
 		LatestRelease: latestRelease,
 	}), nil
+}
+
+// Detect reuses the existing IncidentDetector when a caller already has the
+// current Service, SLO, Runtime, and Release inputs available.
+func (svc *IncidentService) Detect(input IncidentDetectionInput) *ReliabilityIncident {
+	return svc.detector.Detect(input)
+}
+
+func (svc *IncidentService) IsCurrentReleaseFailure(release *ServiceReleaseSummary) bool {
+	return svc.detector.IsCurrentReleaseFailure(release)
 }
 
 func (svc *IncidentService) List(ctx context.Context, r *http.Request) ([]ReliabilityIncident, error) {

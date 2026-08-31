@@ -18,6 +18,7 @@ type portalAPI struct {
 	sloSvc       *SLOService
 	runtimeSvc   *RuntimeService
 	incidentSvc  *IncidentService
+	overviewSvc  *OverviewService
 }
 
 type portalResourceDef struct {
@@ -101,6 +102,7 @@ func registerPortalAPIHandlers(mux *http.ServeMux, cfg Config) {
 	mux.HandleFunc("/api/v1/services/", api.handleServiceDetail)
 	mux.HandleFunc("/api/v1/incidents", api.handleIncidentList)
 	mux.HandleFunc("/api/v1/incidents/", api.handleIncidentDetail)
+	mux.HandleFunc("/api/v1/overview", api.handleReliabilityOverview)
 
 	mux.HandleFunc("/api/evidence-store/status", api.handleEvidenceStoreStatus)
 	mux.HandleFunc("/api/evidence-store/refresh", api.handleEvidenceStoreRefresh)

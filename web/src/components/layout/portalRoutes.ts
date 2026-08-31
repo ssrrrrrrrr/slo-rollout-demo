@@ -2,11 +2,11 @@
   {
     id: "Overview",
     title: "Overview",
-    description: "release health",
+    description: "fleet reliability",
     group: "Platform",
     eyebrow: "Overview",
-    pageTitle: "Release Control Room",
-    pageDescription: "一眼判断当前发布是否安全，并快速跳转到 Evidence、Policy、Supply Chain、Advisor Trace 或 Approval 页面。",
+    pageTitle: "Reliability Overview",
+    pageDescription: "以 Service Fleet 为中心识别当前可靠性风险与优先处理项。",
   },
   {
     id: "Services",
@@ -94,7 +94,7 @@
 export type PortalRoute = (typeof portalRoutes)[number]["id"]
 export type PortalRouteMeta = (typeof portalRoutes)[number]
 
-export const defaultPortalRoute: PortalRoute = "Services"
+export const defaultPortalRoute: PortalRoute = "Overview"
 
 export const platformRoutes = portalRoutes.filter((route) => route.group === "Platform")
 export const workspaceRoutes = portalRoutes.filter((route) => route.group === "Workspaces")

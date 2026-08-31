@@ -16,6 +16,7 @@ type IncidentDetectionInput struct {
 
 type IncidentDetector interface {
 	Detect(input IncidentDetectionInput) *ReliabilityIncident
+	IsCurrentReleaseFailure(release *ServiceReleaseSummary) bool
 }
 
 // DefaultIncidentReleaseFreshnessWindow keeps Release-only incidents bounded to
@@ -48,7 +49,7 @@ func incidentReleaseFreshnessWindow(value string) time.Duration {
 }
 
 func (detector *ReliabilityIncidentDetector) Detect(input IncidentDetectionInput) *ReliabilityIncident {
-	releaseFailureActive := detector.releaseFailureIsActive(input.LatestRelease)
+	releaseFailureActive := detector.IsCurrentReleaseFailure(input.LatestRelease)
 	signals := incidentSignals(input, releaseFailureActive)
 	primary := primaryIncidentSignal(signals, releaseFailureActive)
 	if primary == nil {
@@ -149,7 +150,18 @@ func incidentSeverity(input IncidentDetectionInput, releaseFailureActive bool) I
 	}
 }
 
-func (detector *ReliabilityIncidentDetector) releaseFailureIsActive(release *ServiceReleaseSummary) bool {
+// IsCurrentReleaseFailure is the single active-relevance rule for failed
+// Release evidence. Consumers may retain stale Release data as correlation,
+// but only this helper permits it to affect current reliability state.
+func (detector *ReliabilityIncidentDetector) IsCurrentReleaseFailure(release *ServiceReleaseSummary) bool {
+	now := time.Now
+	if detector.now != nil {
+		now = detector.now
+	}
+	return isCurrentReleaseFailure(release, now(), detector.releaseFreshnessWindow)
+}
+
+func isCurrentReleaseFailure(release *ServiceReleaseSummary, now time.Time, freshnessWindow time.Duration) bool {
 	if release == nil || !isReleaseFailure(release.Status) || strings.TrimSpace(release.Timestamp) == "" {
 		return false
 	}
@@ -157,12 +169,8 @@ func (detector *ReliabilityIncidentDetector) releaseFailureIsActive(release *Ser
 	if err != nil {
 		return false
 	}
-	now := time.Now
-	if detector.now != nil {
-		now = detector.now
-	}
-	age := now().Sub(timestamp)
-	return age >= 0 && age <= detector.releaseFreshnessWindow
+	age := now.Sub(timestamp)
+	return age >= 0 && age <= freshnessWindow
 }
 
 func deterministicIncidentID(key string) string {
