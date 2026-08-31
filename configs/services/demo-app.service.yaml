@@ -1,0 +1,26 @@
+apiVersion: sentinel.io/v1alpha1
+kind: Service
+
+metadata:
+  name: demo-app
+
+spec:
+  displayName: Demo Application
+  owner: platform-team
+
+environments:
+  - dev
+  - staging
+  - prod
+
+runtime:
+  namespace: slo-rollout
+  workload:
+    kind: Rollout
+    name: demo-app
+
+reliability:
+  sloRef: demo-app-canary-slo
+
+delivery:
+  strategyRef: demo-app-canary-strategy

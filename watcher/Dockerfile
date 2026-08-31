@@ -27,6 +27,7 @@ WORKDIR /app
 COPY --from=builder /src/watcher/release-rollout-watcher /app/watcher/release-rollout-watcher
 COPY scripts /app/scripts
 COPY schemas /app/schemas
+COPY configs /app/configs
 COPY watcher/config.k8s.yaml /app/watcher/config.yaml
 
 RUN mkdir -p /app/docs/release-reports && \

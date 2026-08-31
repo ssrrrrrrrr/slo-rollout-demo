@@ -17,10 +17,6 @@ import {
 
 const systemItems = [
   {
-    label: "Services",
-    icon: Network,
-  },
-  {
     label: "Environments",
     icon: Database,
   },
@@ -32,6 +28,7 @@ const systemItems = [
 
 const routeIcon: Record<PortalRoute, typeof ShieldCheck> = {
   Overview: Activity,
+  Services: Network,
   Releases: GitBranch,
   Evidence: Database,
   Policy: ShieldCheck,

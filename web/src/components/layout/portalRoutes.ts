@@ -9,6 +9,15 @@
     pageDescription: "一眼判断当前发布是否安全，并快速跳转到 Evidence、Policy、Supply Chain、Advisor Trace 或 Approval 页面。",
   },
   {
+    id: "Services",
+    title: "Services",
+    description: "service catalog",
+    group: "Platform",
+    eyebrow: "Services",
+    pageTitle: "Service Catalog",
+    pageDescription: "以 Service 为入口查看运行时、可靠性、交付策略和关联发布。",
+  },
+  {
     id: "Releases",
     title: "Releases",
     description: "rollout history",
@@ -21,7 +30,7 @@
     id: "Evidence",
     title: "Evidence",
     description: "EvidenceStore 检索与对象详情",
-    group: "Workspaces",
+    group: "Platform",
     eyebrow: "Evidence",
     pageTitle: "Evidence Objects & Release Graph",
     pageDescription: "查看当前发布关联的 Evidence Object、控制平面对象链路和 EvidenceStore 检索结果。",
@@ -30,7 +39,7 @@
     id: "Policy",
     title: "Policy",
     description: "策略裁决解释与安全边界",
-    group: "Workspaces",
+    group: "Platform",
     eyebrow: "Policy",
     pageTitle: "Policy Decision Explanation",
     pageDescription: "解释本次发布为什么允许、阻断、需要人工审批或保持只读边界。",
@@ -76,7 +85,7 @@
 export type PortalRoute = (typeof portalRoutes)[number]["id"]
 export type PortalRouteMeta = (typeof portalRoutes)[number]
 
-export const defaultPortalRoute: PortalRoute = "Overview"
+export const defaultPortalRoute: PortalRoute = "Services"
 
 export const platformRoutes = portalRoutes.filter((route) => route.group === "Platform")
 export const workspaceRoutes = portalRoutes.filter((route) => route.group === "Workspaces")

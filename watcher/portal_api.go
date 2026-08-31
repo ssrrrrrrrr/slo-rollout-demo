@@ -14,6 +14,7 @@ type portalAPI struct {
 	cfg          Config
 	reportDir    string
 	executionSvc *ExecutionService
+	serviceSvc   *ServiceService
 }
 
 type portalResourceDef struct {
@@ -93,6 +94,8 @@ func registerPortalAPIHandlers(mux *http.ServeMux, cfg Config) {
 	mux.HandleFunc("/api/releases", api.handleReleaseList)
 	mux.HandleFunc("/api/releases/", api.handleReleaseDetail)
 	mux.HandleFunc("/api/releases/latest", api.handleLatestIndex)
+	mux.HandleFunc("/api/v1/services", api.handleServiceList)
+	mux.HandleFunc("/api/v1/services/", api.handleServiceDetail)
 
 	mux.HandleFunc("/api/evidence-store/status", api.handleEvidenceStoreStatus)
 	mux.HandleFunc("/api/evidence-store/refresh", api.handleEvidenceStoreRefresh)

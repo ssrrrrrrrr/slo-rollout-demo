@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ssentinel.io/schemas/service.schema.json",
+  "title": "S Sentinel Service",
+  "description": "A first-class service definition for the S Sentinel release control plane.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec", "environments", "runtime", "reliability", "delivery"],
+  "properties": {
+    "apiVersion": { "type": "string", "const": "sentinel.io/v1alpha1" },
+    "kind": { "type": "string", "const": "Service" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "owner"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "environments": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "workload"],
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "workload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "reliability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sloRef"],
+      "properties": { "sloRef": { "type": "string", "minLength": 1 } }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategyRef"],
+      "properties": { "strategyRef": { "type": "string", "minLength": 1 } }
+    }
+  }
+}

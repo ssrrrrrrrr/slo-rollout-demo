@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchLatestRelease, fetchReleases } from "@/api/releases"
+import { fetchServices } from "@/api/services"
 import {
   fetchReleaseResource,
   getResourceKindByTab,
@@ -8,11 +9,13 @@ import {
 import { LayoutShell } from "@/components/layout/LayoutShell"
 import { PortalRouteRenderer } from "@/components/layout/PortalRouteRenderer"
 import { PortalState } from "@/components/layout/PortalState"
+import { ServicesPage } from "@/components/service/ServicesPage"
 import {
   defaultPortalRoute,
   type PortalRoute,
 } from "@/components/layout/portalRoutes"
 import type { ReleaseContext } from "@/components/layout/ReleaseContextBar"
+import type { ServiceSummary } from "@/types/service"
 
 
 function displayValue(value: unknown, fallback = "unknown") {
@@ -29,6 +32,7 @@ function displayValue(value: unknown, fallback = "unknown") {
 
 function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedServiceName, setSelectedServiceName] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("概览")
   const [activeRoute, setActiveRoute] = useState<PortalRoute>(defaultPortalRoute)
 
@@ -44,12 +48,33 @@ function App() {
     refetchInterval: 15000,
   })
 
+  const servicesQuery = useQuery({
+    queryKey: ["services"],
+    queryFn: fetchServices,
+    refetchInterval: 15000,
+  })
+
   const releases = useMemo(() => releasesQuery.data?.items ?? [], [releasesQuery.data?.items])
   const selected = releases.find((release) => release.releaseId === selectedId) ?? releases[0]
   const selectedSummary = selected?.summary
+  const services = useMemo(() => servicesQuery.data?.items ?? [], [servicesQuery.data?.items])
+  const selectedService = services.find((service) => service.name === selectedServiceName) ?? services[0]
+  const isServicesRoute = activeRoute === "Services"
   const resourceKind = getResourceKindByTab(activeTab)
 
   const releaseContext = useMemo<ReleaseContext>(() => {
+    if (isServicesRoute) {
+      const service = selectedService as ServiceSummary | undefined
+      return {
+        service: service?.name ?? "no service",
+        environment: service?.environments.join(", ") || "unknown",
+        releaseId: service?.latestRelease?.id ?? "no release",
+        version: "not reported",
+        result: service?.latestRelease?.status ?? "unknown",
+        imageDigest: "not reported",
+      }
+    }
+
     const release = selected as Record<string, unknown> | undefined
     const summary = selectedSummary as Record<string, unknown> | undefined
 
@@ -61,7 +86,7 @@ function App() {
       result: displayValue(summary?.releaseResult ?? summary?.result ?? release?.result, "unknown"),
       imageDigest: displayValue(summary?.imageDigest ?? release?.imageDigest ?? release?.digest, "not reported"),
     }
-  }, [selected, selectedSummary])
+  }, [isServicesRoute, selected, selectedService, selectedSummary])
 
   const resourceQuery = useQuery({
     queryKey: ["release-resource", selected?.releaseId, resourceKind],
@@ -77,12 +102,17 @@ function App() {
     staleTime: 10000,
   })
 
-  const isLoading = releasesQuery.isLoading || latestQuery.isLoading
-  const hasError = releasesQuery.isError || latestQuery.isError
+  const isLoading = isServicesRoute
+    ? servicesQuery.isLoading
+    : releasesQuery.isLoading || latestQuery.isLoading
+  const hasError = isServicesRoute
+    ? servicesQuery.isError
+    : releasesQuery.isError || latestQuery.isError
 
   function refreshAll() {
     void releasesQuery.refetch()
     void latestQuery.refetch()
+    void servicesQuery.refetch()
     void environmentEvidenceQuery.refetch()
   }
 
@@ -90,7 +120,7 @@ function App() {
     <LayoutShell
       hasError={hasError}
       latest={latestQuery.data}
-      generatedAt={releasesQuery.data?.generatedAt}
+      generatedAt={isServicesRoute ? servicesQuery.data?.generatedAt : releasesQuery.data?.generatedAt}
       activeRoute={activeRoute}
       onRouteChange={setActiveRoute}
       releaseContext={releaseContext}
@@ -100,6 +130,16 @@ function App() {
         <PortalState kind="loading" />
       ) : hasError ? (
         <PortalState kind="error" />
+      ) : isServicesRoute ? (
+        <ServicesPage
+          services={services}
+          selected={selectedService}
+          onSelect={setSelectedServiceName}
+          onOpenRelease={(releaseId) => {
+            setSelectedId(releaseId)
+            setActiveRoute("Releases")
+          }}
+        />
       ) : !selected || !selectedSummary ? (
         <PortalState kind="empty" />
       ) : (
