@@ -5,7 +5,7 @@
   "description": "A first-class service definition for the S Sentinel release control plane.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["apiVersion", "kind", "metadata", "spec", "environments", "runtime", "reliability", "delivery"],
+  "required": ["apiVersion", "kind", "metadata", "spec", "environments", "reliability", "delivery"],
   "properties": {
     "apiVersion": { "type": "string", "const": "sentinel.io/v1alpha1" },
     "kind": { "type": "string", "const": "Service" },
@@ -38,7 +38,6 @@
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace", "workload"],
       "properties": {
         "namespace": { "type": "string", "minLength": 1 },
         "workload": {

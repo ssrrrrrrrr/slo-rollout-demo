@@ -179,8 +179,8 @@ func validateService(service Service) error {
 	if strings.TrimSpace(service.Spec.DisplayName) == "" || strings.TrimSpace(service.Spec.Owner) == "" {
 		return fmt.Errorf("spec.displayName and spec.owner are required")
 	}
-	if len(service.Environments) == 0 || strings.TrimSpace(service.Runtime.Namespace) == "" || strings.TrimSpace(service.Runtime.Workload.Kind) == "" || strings.TrimSpace(service.Runtime.Workload.Name) == "" {
-		return fmt.Errorf("environments and runtime reference are required")
+	if len(service.Environments) == 0 {
+		return fmt.Errorf("environments are required")
 	}
 	if strings.TrimSpace(service.Delivery.StrategyRef) == "" {
 		return fmt.Errorf("delivery.strategyRef is required")

@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react"
 import { KeyValueRows } from "@/components/common/KeyValueRows"
 import { Panel } from "@/components/common/Panel"
 import { Pill } from "@/components/common/Pill"
+import { ServiceRuntimePanel } from "@/components/service/ServiceRuntimePanel"
 import { ServiceSLOPanel } from "@/components/service/ServiceSLOPanel"
 import type { ServiceSummary } from "@/types/service"
 import { formatTime } from "@/utils/format"
@@ -35,6 +36,8 @@ export function ServiceDetailPage({
       </Panel>
 
       <ServiceSLOPanel serviceName={service.name} />
+
+      <ServiceRuntimePanel serviceName={service.name} />
 
       <Panel>
         <h4 className="text-sm font-semibold text-slate-100">Service references</h4>

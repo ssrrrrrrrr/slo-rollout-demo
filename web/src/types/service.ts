@@ -72,3 +72,51 @@ export type ServiceSLOResponse = {
   schemaVersion: string
   slo: ServiceSLOStatus
 }
+
+export type RuntimeStatus = "HEALTHY" | "DEGRADED" | "UNHEALTHY" | "UNKNOWN"
+
+export type RuntimeWorkloadStatus = {
+  kind?: string
+  name?: string
+  phase?: string
+  revision?: string
+  desiredReplicas: number
+  readyReplicas: number
+  availableReplicas: number
+  updatedReplicas: number
+}
+
+export type RuntimeContainerStatus = {
+  name: string
+  ready: boolean
+  restartCount: number
+  image?: string
+}
+
+export type RuntimePodStatus = {
+  name: string
+  phase: string
+  ready: boolean
+  restartCount: number
+  node?: string
+  image?: string
+  createdAt?: string
+  containers?: RuntimeContainerStatus[]
+}
+
+export type RuntimeSnapshot = {
+  service: string
+  status: RuntimeStatus
+  namespace?: string
+  workload: RuntimeWorkloadStatus
+  primaryImage?: string
+  images?: string[]
+  pods: RuntimePodStatus[]
+  observedAt: string
+  reason?: string
+}
+
+export type ServiceRuntimeResponse = {
+  schemaVersion: string
+  runtime: RuntimeSnapshot
+}

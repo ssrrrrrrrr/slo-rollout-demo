@@ -16,6 +16,7 @@ type portalAPI struct {
 	executionSvc *ExecutionService
 	serviceSvc   *ServiceService
 	sloSvc       *SLOService
+	runtimeSvc   *RuntimeService
 }
 
 type portalResourceDef struct {
