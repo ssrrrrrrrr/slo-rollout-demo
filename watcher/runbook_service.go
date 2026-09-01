@@ -30,6 +30,7 @@ type RecoveryService struct {
 	mu              sync.Mutex
 	executions      map[string]RecoveryExecution
 	approvals       map[string]RecoveryApprovalState
+	agent           *ReliabilityAgentService
 }
 
 func NewRecoveryService(incidents *IncidentService, runtime *RuntimeService, services *ServiceService, repoDir string, executor RecoveryExecutor) *RecoveryService {
@@ -118,6 +119,18 @@ func (svc *RecoveryService) Plan(ctx context.Context, r *http.Request, id string
 		plan.Execution = execution
 		v, _ := svc.verify(ctx, plan, *execution)
 		plan.Verification = &v
+	}
+	plan.PlannerSource = "DETERMINISTIC"
+	if svc.agent != nil {
+		if analysis := svc.agent.Cached(ctx, r, id); analysis != nil {
+			plan.AgentAnalysis = analysis
+			for _, candidate := range analysis.CandidateRunbooks {
+				if candidate.ID == book.Metadata.Name {
+					plan.PlannerSource = "AGENT_ASSISTED"
+					break
+				}
+			}
+		}
 	}
 	return plan, nil
 }

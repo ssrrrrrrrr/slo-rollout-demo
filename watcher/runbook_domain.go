@@ -89,6 +89,8 @@ type RecoveryPlan struct {
 	BlockedReasons []string               `json:"blockedReasons"`
 	Execution      *RecoveryExecution     `json:"execution,omitempty"`
 	Verification   *RecoveryVerification  `json:"verification,omitempty"`
+	AgentAnalysis  *AgentDiagnosis        `json:"agentAnalysis,omitempty"`
+	PlannerSource  string                 `json:"plannerSource,omitempty"`
 }
 type RecoveryExecution struct {
 	RequestKey       string             `json:"requestKey"`

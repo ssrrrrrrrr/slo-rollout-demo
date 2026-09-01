@@ -62,6 +62,10 @@ func (api *portalAPI) handleIncidentDetail(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "analysis" {
+		api.handleIncidentAnalysis(w, r, parts[0])
+		return
+	}
 	if !api.requireGET(w, r) {
 		return
 	}

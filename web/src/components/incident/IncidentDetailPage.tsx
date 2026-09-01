@@ -3,6 +3,7 @@ import { KeyValueRows } from "@/components/common/KeyValueRows"
 import { Panel } from "@/components/common/Panel"
 import { IncidentRemediationPanel } from "@/components/incident/IncidentRemediationPanel"
 import { IncidentRecoveryPanel } from "@/components/incident/IncidentRecoveryPanel"
+import { IncidentAnalysisPanel } from "@/components/incident/IncidentAnalysisPanel"
 import type { ReliabilityIncident } from "@/types/incident"
 import { formatTime } from "@/utils/format"
 
@@ -76,6 +77,7 @@ export function IncidentDetailPage({ incident, onOpenRelease }: { incident: Reli
       ) : null}
 
       <IncidentRemediationPanel incidentId={incident.id} />
+      <IncidentAnalysisPanel incidentId={incident.id} />
       <IncidentRecoveryPanel incidentId={incident.id} />
 
       <Panel>
