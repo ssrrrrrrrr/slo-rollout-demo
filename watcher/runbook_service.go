@@ -27,6 +27,7 @@ type RecoveryService struct {
 	planner         RecoveryPlanner
 	executor        RecoveryExecutor
 	rollback        *RemediationService
+	operation       *OperationService
 	mu              sync.Mutex
 	executions      map[string]RecoveryExecution
 	approvals       map[string]RecoveryApprovalState
@@ -34,13 +35,23 @@ type RecoveryService struct {
 }
 
 func NewRecoveryService(incidents *IncidentService, runtime *RuntimeService, services *ServiceService, repoDir string, executor RecoveryExecutor) *RecoveryService {
-	return &RecoveryService{incidentService: incidents, runtimeService: runtime, services: services, runbookDir: filepath.Join(repoDir, "configs", "runbooks"), planner: DeterministicRecoveryPlanner{}, executor: executor, rollback: NewRemediationService(incidents, incidents.sloService, runtime, services.repository, NewRuntimeActionPipelineAdapter(repoDir, filepath.Join(repoDir, "docs", "release-reports"))), executions: map[string]RecoveryExecution{}, approvals: map[string]RecoveryApprovalState{}}
+	rollback := NewRemediationService(incidents, incidents.sloService, runtime, services.repository, NewRuntimeActionPipelineAdapter(repoDir, filepath.Join(repoDir, "docs", "release-reports")))
+	operation := NewOperationService(NewOperationExecutorRegistry(
+		ReleaseRuntimeActionExecutorAdapter{adapter: rollback.executionAdapter},
+		KubernetesRecoveryExecutorAdapter{executor: executor},
+	))
+	rollback.operation = operation
+	return &RecoveryService{incidentService: incidents, runtimeService: runtime, services: services, runbookDir: filepath.Join(repoDir, "configs", "runbooks"), planner: DeterministicRecoveryPlanner{}, executor: executor, rollback: rollback, operation: operation, executions: map[string]RecoveryExecution{}, approvals: map[string]RecoveryApprovalState{}}
 }
 func (api *portalAPI) recoveryService() *RecoveryService {
 	if api.recoverySvc != nil {
 		return api.recoverySvc
 	}
-	return NewRecoveryService(api.incidentService(), api.runtimeService(), api.serviceService(), api.cfg.RepoDir, NewKubernetesRecoveryExecutor())
+	svc := NewRecoveryService(api.incidentService(), api.runtimeService(), api.serviceService(), api.cfg.RepoDir, NewKubernetesRecoveryExecutor())
+	svc.operation = api.operationService()
+	svc.rollback.operation = svc.operation
+	api.recoverySvc = svc
+	return svc
 }
 func (svc *RecoveryService) Load() ([]Runbook, error) {
 	files, err := filepath.Glob(filepath.Join(svc.runbookDir, "*.runbook.yaml"))
@@ -94,6 +105,9 @@ func (svc *RecoveryService) Plan(ctx context.Context, r *http.Request, id string
 	}
 	book := svc.planner.Plan(*incident, service, books)
 	plan := RecoveryPlan{IncidentID: id, Service: service.Metadata.Name, Status: RecoveryPlanNotActionable, BlockedReasons: []string{}}
+	if incident.RelatedRelease != nil {
+		plan.ReleaseID = incident.RelatedRelease.ID
+	}
 	plan.Diagnosis.Category = "RUNTIME_FAILURE"
 	plan.Diagnosis.Reason = incident.Runtime.Reason
 	plan.Target = RecoveryTarget{service.Runtime.Namespace, service.Runtime.Workload.Kind, service.Runtime.Workload.Name}
@@ -115,7 +129,8 @@ func (svc *RecoveryService) Plan(ctx context.Context, r *http.Request, id string
 		plan.Status = RecoveryPlanBlocked
 		plan.Reason = plan.Preflight.Reason
 	}
-	if execution := svc.executionFor(plan.ID); execution != nil {
+	plan.OperationID = recoveryControlledOperation(plan, svc.approvalFor(plan), nil).ID
+	if execution := svc.executionFor(plan.OperationID); execution != nil {
 		plan.Execution = execution
 		v, _ := svc.verify(ctx, plan, *execution)
 		plan.Verification = &v
@@ -159,10 +174,17 @@ func recoveryEligibility(plan RecoveryPlan) RemediationEligibility {
 	return RemediationEligibility{Eligible: true, BlockingReasons: []string{}}
 }
 func (svc *RecoveryService) approvedFor(plan RecoveryPlan) bool {
+	return svc.approvalFor(plan) != nil
+}
+func (svc *RecoveryService) approvalFor(plan RecoveryPlan) *RecoveryApprovalState {
 	svc.mu.Lock()
 	defer svc.mu.Unlock()
 	state, ok := svc.approvals[plan.ID]
-	return ok && state.Approved && state.PlanID == plan.ID && state.IncidentID == plan.IncidentID && state.Service == plan.Service && state.Action == plan.Action.Type && state.Target == plan.Target
+	if !ok || !state.Approved || state.PlanID != plan.ID || state.IncidentID != plan.IncidentID || state.Service != plan.Service || state.Action != plan.Action.Type || state.Target != plan.Target {
+		return nil
+	}
+	copy := state
+	return &copy
 }
 func (svc *RecoveryService) Approve(ctx context.Context, r *http.Request, incidentID, planID string) (RecoveryPlan, error) {
 	plan, err := svc.Plan(ctx, r, incidentID)
@@ -178,7 +200,11 @@ func (svc *RecoveryService) Approve(ctx context.Context, r *http.Request, incide
 	svc.mu.Lock()
 	svc.approvals[plan.ID] = RecoveryApprovalState{PlanID: plan.ID, IncidentID: plan.IncidentID, Service: plan.Service, Action: plan.Action.Type, Target: plan.Target, Approved: true, ApprovedAt: time.Now().UTC().Format(time.RFC3339)}
 	svc.mu.Unlock()
-	return svc.Plan(ctx, r, incidentID)
+	approved, err := svc.Plan(ctx, r, incidentID)
+	if err == nil {
+		svc.incidentService.RecordRecoveryApproval(ctx, incidentID, approved)
+	}
+	return approved, err
 }
 func (svc *RecoveryService) Preview(ctx context.Context, r *http.Request, id string) (RecoveryPlan, error) {
 	return svc.Plan(ctx, r, id)
@@ -194,52 +220,43 @@ func (svc *RecoveryService) Execute(ctx context.Context, r *http.Request, id, pl
 	if !plan.Preflight.Eligible {
 		return plan, &RemediationRequestError{StatusCode: 409, Message: plan.Preflight.Reason}
 	}
+	if svc.operation == nil {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: "controlled operation service is unavailable"}
+	}
+	var releasePlan *RemediationPlan
 	if plan.Action.Type == RecoveryRollbackRelease {
-		// Rollback is deliberately not implemented by RecoveryExecutor. It is a
-		// narrow bridge to the Stage 6 remediation adapter and its established
-		// Runtime Action result, policy, approval, and execution gates.
-		legacy, legacyErr := svc.rollback.Execute(ctx, r, id, "ROLLBACK")
-		if legacyErr != nil {
-			return plan, legacyErr
+		candidate, candidateErr := svc.rollback.Plan(ctx, r, id)
+		if candidateErr != nil {
+			return plan, candidateErr
 		}
-		x := RecoveryExecution{RequestKey: plan.ID, Action: RecoveryRollbackRelease, Status: "SUCCEEDED"}
-		if legacy.Execution == nil || legacy.Execution.Status != "SUCCEEDED" {
-			x.Status, x.Reason = "FAILED", "existing rollback pipeline did not verify the action"
+		if candidate.Recommendation.Action != "ROLLBACK" || !candidate.Eligibility.Eligible {
+			return plan, &RemediationRequestError{StatusCode: 409, Message: firstNonEmpty(candidate.Eligibility.Reason, "existing release rollback plan is not eligible")}
 		}
-		svc.mu.Lock()
-		svc.executions[plan.ID] = x
-		svc.mu.Unlock()
-		plan.Execution = &x
-		verification, _ := svc.verify(ctx, plan, x)
-		plan.Verification = &verification
-		return plan, nil
+		releasePlan = &candidate
 	}
-	if svc.executor == nil || !svc.executor.Supports(plan.Action.Type) {
-		return plan, &RemediationRequestError{StatusCode: 409, Message: "recovery executor is unavailable"}
-	}
+	op := recoveryControlledOperation(plan, svc.approvalFor(plan), releasePlan)
+	plan.OperationID = op.ID
 	svc.mu.Lock()
-	if x, ok := svc.executions[plan.ID]; ok {
+	if x, ok := svc.executions[op.IdempotencyKey]; ok {
 		x.Idempotent = true
 		plan.Execution = &x
 		svc.mu.Unlock()
 		return plan, nil
 	}
 	svc.mu.Unlock()
-	if err := svc.executor.Preflight(ctx, plan); err != nil {
-		return plan, &RemediationRequestError{StatusCode: 409, Message: err.Error()}
-	}
-	replicas, err := svc.executor.Execute(ctx, plan)
-	x := RecoveryExecution{RequestKey: plan.ID, Action: plan.Action.Type, ExpectedReplicas: replicas, Status: "SUCCEEDED"}
+	result, err := svc.operation.Execute(ctx, op)
+	x := RecoveryExecution{RequestKey: op.IdempotencyKey, Action: plan.Action.Type, ExpectedReplicas: result.ExpectedReplicas, Status: result.Execution.Status, Reason: result.Execution.Reason}
 	if err != nil {
 		x.Status = "FAILED"
 		x.Reason = err.Error()
 	}
 	svc.mu.Lock()
-	svc.executions[plan.ID] = x
+	svc.executions[op.IdempotencyKey] = x
 	svc.mu.Unlock()
 	plan.Execution = &x
 	v, _ := svc.verify(ctx, plan, x)
 	plan.Verification = &v
+	svc.incidentService.RecordRecoveryVerification(ctx, id, v)
 	return plan, nil
 }
 func (svc *RecoveryService) Verification(ctx context.Context, r *http.Request, id string) (RecoveryVerification, error) {

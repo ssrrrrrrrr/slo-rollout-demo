@@ -5,6 +5,7 @@ repoDir: /app
 reportDir: /app/docs/release-reports
 stateFile: /app/docs/release-reports/go-rollout-watcher-state.json
 evidenceStoreDB: /app/docs/release-reports/evidence-store/portal-evidence-store.db
+incidentStoreDB: /app/docs/release-reports/incident-store/incidents.db
 evidenceStoreScriptFile: /app/scripts/evidence-store.py
 evidenceStorePython: python3
 evidenceStoreRefreshStateFile: /app/docs/release-reports/evidence-store/portal-evidence-store-refresh.json

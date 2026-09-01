@@ -21,6 +21,7 @@ type portalAPI struct {
 	remediationSvc *RemediationService
 	recoverySvc    *RecoveryService
 	agentSvc       *ReliabilityAgentService
+	operationSvc   *OperationService
 	overviewSvc    *OverviewService
 }
 

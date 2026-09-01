@@ -37,7 +37,11 @@ func (api *portalAPI) handleIncidentList(w http.ResponseWriter, r *http.Request)
 	if !api.requireGET(w, r) {
 		return
 	}
-	incidents, err := api.incidentService().List(r.Context(), r)
+	query := IncidentListQuery{IncludeResolved: strings.EqualFold(r.URL.Query().Get("includeResolved"), "true")}
+	if state := strings.TrimSpace(r.URL.Query().Get("state")); state != "" {
+		query.States = []IncidentStatus{IncidentStatus(strings.ToUpper(state))}
+	}
+	incidents, err := api.incidentService().ListWithQuery(r.Context(), r, query)
 	if err != nil {
 		api.writeIncidentError(w, err)
 		return
@@ -66,6 +70,18 @@ func (api *portalAPI) handleIncidentDetail(w http.ResponseWriter, r *http.Reques
 		api.handleIncidentAnalysis(w, r, parts[0])
 		return
 	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "timeline" {
+		if !api.requireGET(w, r) {
+			return
+		}
+		events, err := api.incidentService().Timeline(r.Context(), parts[0])
+		if err != nil {
+			api.writeIncidentError(w, err)
+			return
+		}
+		writePortalJSON(w, http.StatusOK, map[string]interface{}{"schemaVersion": "incident.timeline/v1alpha1", "incidentId": parts[0], "items": events})
+		return
+	}
 	if !api.requireGET(w, r) {
 		return
 	}
@@ -83,16 +99,12 @@ func (api *portalAPI) handleIncidentDetail(w http.ResponseWriter, r *http.Reques
 }
 
 func (api *portalAPI) handleServiceIncidents(w http.ResponseWriter, r *http.Request, serviceName string) {
-	incident, err := api.incidentService().ActiveForService(r.Context(), r, serviceName)
+	incidents, err := api.incidentService().ListWithQuery(r.Context(), r, IncidentListQuery{Service: serviceName})
 	if err != nil {
 		api.writeIncidentError(w, err)
 		return
 	}
-	items := []ReliabilityIncident{}
-	if incident != nil {
-		items = append(items, *incident)
-	}
-	writePortalJSON(w, http.StatusOK, serviceIncidentListResponse{SchemaVersion: "incident.serviceList/v1alpha1", GeneratedAt: time.Now().Format(time.RFC3339), Service: serviceName, Count: len(items), Items: items})
+	writePortalJSON(w, http.StatusOK, serviceIncidentListResponse{SchemaVersion: "incident.serviceList/v1alpha1", GeneratedAt: time.Now().Format(time.RFC3339), Service: serviceName, Count: len(incidents), Items: incidents})
 }
 
 func (api *portalAPI) handleServiceActiveIncident(w http.ResponseWriter, r *http.Request, serviceName string) {

@@ -59,13 +59,13 @@ func (detector *ReliabilityIncidentDetector) Detect(input IncidentDetectionInput
 
 	observedAt := incidentObservedAt()
 	relatedRelease := incidentRelatedRelease(input.LatestRelease)
-	key := input.Service.Metadata.Name + ":" + primary.Type
-	if relatedRelease != nil {
-		key += ":" + relatedRelease.ID
-	}
+	key := incidentFingerprintKey(input.Service.Metadata.Name, primary.Type, relatedRelease)
 
 	incident := &ReliabilityIncident{
+		// Detector identity remains deterministic for compatibility with direct
+		// observation consumers. The lifecycle replaces ID for durable episodes.
 		ID:              deterministicIncidentID(key),
+		Fingerprint:     deterministicIncidentFingerprint(key),
 		Service:         input.Service.Metadata.Name,
 		Status:          IncidentStatusActive,
 		Severity:        incidentSeverity(input, releaseFailureActive),
@@ -82,6 +82,14 @@ func (detector *ReliabilityIncidentDetector) Detect(input IncidentDetectionInput
 	}
 	incident.Timeline = synthesizeIncidentTimeline(incident)
 	return incident
+}
+
+func incidentFingerprintKey(service, primarySignal string, relatedRelease *IncidentCorrelation) string {
+	key := service + ":" + primarySignal
+	if relatedRelease != nil {
+		key += ":" + relatedRelease.ID
+	}
+	return key
 }
 
 func incidentSignals(input IncidentDetectionInput, releaseFailureActive bool) []IncidentSignal {
@@ -192,6 +200,11 @@ func releaseStatus(release *ServiceReleaseSummary) string {
 func deterministicIncidentID(key string) string {
 	hash := sha256.Sum256([]byte(key))
 	return "INC-" + hex.EncodeToString(hash[:])[:8]
+}
+
+func deterministicIncidentFingerprint(key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return "IFP-" + hex.EncodeToString(hash[:])[:8]
 }
 
 func incidentRelatedRelease(release *ServiceReleaseSummary) *IncidentCorrelation {

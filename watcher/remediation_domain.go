@@ -19,6 +19,7 @@ const (
 )
 
 type RemediationPlan struct {
+	OperationID    string                   `json:"operationId,omitempty"`
 	IncidentID     string                   `json:"incidentId"`
 	Service        string                   `json:"service"`
 	Status         RemediationPlanStatus    `json:"status"`

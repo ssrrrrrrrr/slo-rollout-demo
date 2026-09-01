@@ -46,6 +46,13 @@ func (e *KubernetesRecoveryExecutor) Execute(ctx context.Context, p RecoveryPlan
 	if err := e.Preflight(ctx, p); err != nil {
 		return 0, err
 	}
+	return e.ExecutePreflighted(ctx, p)
+}
+
+// ExecutePreflighted is intentionally internal to the controlled operation
+// adapter. It preserves the established mutation algorithm while allowing the
+// adapter to avoid evaluating the same preflight twice.
+func (e *KubernetesRecoveryExecutor) ExecutePreflighted(ctx context.Context, p RecoveryPlan) (int64, error) {
 	resource := e.client.Resource(rolloutGVR).Namespace(p.Target.Namespace)
 	rollout, err := resource.Get(ctx, p.Target.Name, metav1.GetOptions{})
 	if err != nil {

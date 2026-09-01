@@ -6,6 +6,7 @@ type IncidentStatus string
 
 const (
 	IncidentStatusActive     IncidentStatus = "ACTIVE"
+	IncidentStatusMitigating IncidentStatus = "MITIGATING"
 	IncidentStatusRecovering IncidentStatus = "RECOVERING"
 	IncidentStatusResolved   IncidentStatus = "RESOLVED"
 	IncidentStatusUnknown    IncidentStatus = "UNKNOWN"
@@ -20,24 +21,33 @@ const (
 	IncidentSeveritySEV4 IncidentSeverity = "SEV4"
 )
 
-// ReliabilityIncident is an ephemeral, explainable aggregation of current
-// Service reliability signals. It does not represent a persisted incident record.
+// ReliabilityIncident is the durable incident episode projection returned by
+// the API. ReliabilityIncidentDetector still produces an observation/candidate;
+// IncidentLifecycleService assigns the durable ID and lifecycle fields.
 type ReliabilityIncident struct {
-	ID              string                   `json:"id"`
-	Service         string                   `json:"service"`
-	Status          IncidentStatus           `json:"status"`
-	Severity        IncidentSeverity         `json:"severity"`
-	Title           string                   `json:"title"`
-	PrimarySignal   IncidentSignal           `json:"primarySignal"`
-	Signals         []IncidentSignal         `json:"signals"`
-	RelatedRelease  *IncidentCorrelation     `json:"relatedRelease,omitempty"`
-	Recommendation  *IncidentRecommendation  `json:"recommendation,omitempty"`
-	ReleaseEvidence *IncidentReleaseEvidence `json:"releaseEvidence,omitempty"`
-	SLO             ServiceSLOStatus         `json:"slo"`
-	Runtime         RuntimeSnapshot          `json:"runtime"`
-	Timeline        []IncidentTimelineEvent  `json:"timeline"`
-	StartedAt       string                   `json:"startedAt"`
-	ObservedAt      string                   `json:"observedAt"`
+	ID                  string                   `json:"id"`
+	Fingerprint         string                   `json:"fingerprint,omitempty"`
+	Service             string                   `json:"service"`
+	Status              IncidentStatus           `json:"status"`
+	Severity            IncidentSeverity         `json:"severity"`
+	Title               string                   `json:"title"`
+	PrimarySignal       IncidentSignal           `json:"primarySignal"`
+	Signals             []IncidentSignal         `json:"signals"`
+	RelatedRelease      *IncidentCorrelation     `json:"relatedRelease,omitempty"`
+	Recommendation      *IncidentRecommendation  `json:"recommendation,omitempty"`
+	ReleaseEvidence     *IncidentReleaseEvidence `json:"releaseEvidence,omitempty"`
+	SLO                 ServiceSLOStatus         `json:"slo"`
+	Runtime             RuntimeSnapshot          `json:"runtime"`
+	Timeline            []IncidentTimelineEvent  `json:"timeline"`
+	StartedAt           string                   `json:"startedAt"`
+	ObservedAt          string                   `json:"observedAt"`
+	FirstObservedAt     string                   `json:"firstObservedAt,omitempty"`
+	LastObservedAt      string                   `json:"lastObservedAt,omitempty"`
+	MitigationStartedAt string                   `json:"mitigationStartedAt,omitempty"`
+	RecoveringAt        string                   `json:"recoveringAt,omitempty"`
+	ResolvedAt          string                   `json:"resolvedAt,omitempty"`
+	CreatedAt           string                   `json:"createdAt,omitempty"`
+	UpdatedAt           string                   `json:"updatedAt,omitempty"`
 }
 
 type IncidentSignal struct {
@@ -67,9 +77,11 @@ type IncidentReleaseEvidence struct {
 }
 
 type IncidentTimelineEvent struct {
-	Type       string `json:"type"`
-	Message    string `json:"message"`
-	OccurredAt string `json:"occurredAt"`
+	ID         string                 `json:"id,omitempty"`
+	Type       string                 `json:"type"`
+	Message    string                 `json:"message"`
+	OccurredAt string                 `json:"occurredAt"`
+	Payload    map[string]interface{} `json:"payload,omitempty"`
 }
 
 func incidentObservedAt() string {

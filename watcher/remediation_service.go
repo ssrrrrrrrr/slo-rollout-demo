@@ -20,19 +20,23 @@ type RemediationService struct {
 	runtimeService   *RuntimeService
 	repository       EvidenceRepository
 	executionAdapter RemediationExecutionAdapter
+	operation        *OperationService
 	mu               sync.Mutex
 	executions       map[string]RemediationExecution
 }
 
 func NewRemediationService(incidentService *IncidentService, sloService *SLOService, runtimeService *RuntimeService, repository EvidenceRepository, executionAdapter RemediationExecutionAdapter) *RemediationService {
-	return &RemediationService{incidentService: incidentService, sloService: sloService, runtimeService: runtimeService, repository: repository, executionAdapter: executionAdapter, executions: map[string]RemediationExecution{}}
+	return &RemediationService{incidentService: incidentService, sloService: sloService, runtimeService: runtimeService, repository: repository, executionAdapter: executionAdapter, operation: NewOperationService(NewOperationExecutorRegistry(ReleaseRuntimeActionExecutorAdapter{adapter: executionAdapter})), executions: map[string]RemediationExecution{}}
 }
 
 func (api *portalAPI) remediationService() *RemediationService {
 	if api.remediationSvc != nil {
 		return api.remediationSvc
 	}
-	return NewRemediationService(api.incidentService(), api.sloService(), api.runtimeService(), api.evidenceRepository(), NewRuntimeActionPipelineAdapter(api.cfg.RepoDir, api.reportDir))
+	svc := NewRemediationService(api.incidentService(), api.sloService(), api.runtimeService(), api.evidenceRepository(), NewRuntimeActionPipelineAdapter(api.cfg.RepoDir, api.reportDir))
+	svc.operation = api.operationService()
+	api.remediationSvc = svc
+	return svc
 }
 
 func (svc *RemediationService) Plan(ctx context.Context, r *http.Request, incidentID string) (RemediationPlan, error) {
@@ -87,6 +91,7 @@ func (svc *RemediationService) Plan(ctx context.Context, r *http.Request, incide
 		}
 	}
 	plan.AllowedActions = []string{action}
+	plan.OperationID = remediationControlledOperation(plan).ID
 	plan.Eligibility = remediationEligibility(plan)
 	if policyDenied(plan.Policy.Decision) {
 		plan.Status = RemediationPlanBlocked
@@ -100,7 +105,7 @@ func (svc *RemediationService) Plan(ctx context.Context, r *http.Request, incide
 			plan.Eligibility = remediationBlockedEligibility(plan.Eligibility, err.Error())
 		}
 	}
-	plan.Execution = svc.executionFor(remediationRequestKey(plan.IncidentID, release.ID, action))
+	plan.Execution = svc.executionFor(plan.OperationID)
 	if plan.Execution != nil {
 		verification, _ := svc.verify(ctx, r, plan, *plan.Execution)
 		plan.Verification = &verification
@@ -234,10 +239,12 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 	if !plan.Eligibility.Eligible {
 		return plan, &RemediationRequestError{StatusCode: 409, Message: plan.Eligibility.Reason}
 	}
-	if svc.executionAdapter == nil {
-		return plan, &RemediationRequestError{StatusCode: 409, Message: "existing runtime action execution adapter is unavailable"}
+	if svc.operation == nil {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: "controlled operation service is unavailable"}
 	}
-	key := remediationRequestKey(plan.IncidentID, plan.RelatedRelease.ID, requestedAction)
+	op := remediationControlledOperation(plan)
+	plan.OperationID = op.ID
+	key := op.IdempotencyKey
 	svc.mu.Lock()
 	if existing, ok := svc.executions[key]; ok {
 		existing.Idempotent = true
@@ -247,7 +254,7 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 	}
 	svc.executions[key] = RemediationExecution{RequestKey: key, Status: "EXECUTING", Action: requestedAction, Target: plan.Target}
 	svc.mu.Unlock()
-	result, err := svc.executionAdapter.Execute(ctx, RemediationExecutionRequest{ReleaseID: plan.RelatedRelease.ID, Action: requestedAction})
+	result, err := svc.operation.Execute(ctx, op)
 	if unavailable := (*RuntimeActionPipelineUnavailableError)(nil); errors.As(err, &unavailable) {
 		svc.mu.Lock()
 		delete(svc.executions, key)
@@ -258,10 +265,13 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 	if err != nil {
 		execution.Status, execution.Reason = "FAILED", err.Error()
 	} else {
-		execution.Status = result.Status
-		execution.StartedAt, execution.FinishedAt = result.StartedAt, result.FinishedAt
-		execution.Reason, execution.Target, execution.PostState = result.Reason, result.Target, result.PostState
-		execution.ResultID, execution.ActionVerified = result.ResultID, result.ActionVerified
+		execution.Status = result.Execution.Status
+		execution.StartedAt, execution.FinishedAt = result.Execution.StartedAt, result.Execution.FinishedAt
+		execution.Reason, execution.PostState = result.Execution.Reason, result.PostState
+		execution.ResultID, execution.ActionVerified = result.Execution.ExternalResultID, result.ActionVerified
+		if result.ExternalTarget.Namespace != "" || result.ExternalTarget.WorkloadName != "" {
+			execution.Target = RemediationTarget{ReleaseID: result.ExternalTarget.ReleaseID, Namespace: result.ExternalTarget.Namespace, Workload: result.ExternalTarget.WorkloadName}
+		}
 		if execution.Status != "SUCCEEDED" || !execution.ActionVerified {
 			execution.Status = "FAILED"
 		}
@@ -272,6 +282,7 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 	plan.Execution = &execution
 	verification, _ := svc.verify(ctx, r, plan, execution)
 	plan.Verification = &verification
+	svc.incidentService.RecordRemediationVerification(ctx, incidentID, verification)
 	return plan, nil
 }
 

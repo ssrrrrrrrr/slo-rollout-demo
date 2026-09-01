@@ -95,6 +95,7 @@ func (s *ReliabilityAgentService) Analyze(ctx context.Context, r *http.Request, 
 	s.mu.Lock()
 	s.cache[id] = agentAnalysisCacheEntry{c.Fingerprint, d, time.Now()}
 	s.mu.Unlock()
+	s.incidents.RecordAgentAnalysis(ctx, id, d)
 	return d, nil
 }
 func (s *ReliabilityAgentService) Cached(ctx context.Context, r *http.Request, id string) *AgentDiagnosis {

@@ -41,6 +41,7 @@ type Config struct {
 	ReportDir                      string `yaml:"reportDir"`
 	StateFile                      string `yaml:"stateFile"`
 	EvidenceStoreDB                string `yaml:"evidenceStoreDB"`
+	IncidentStoreDB                string `yaml:"incidentStoreDB"`
 	EvidenceStoreScriptFile        string `yaml:"evidenceStoreScriptFile"`
 	EvidenceStorePython            string `yaml:"evidenceStorePython"`
 	EvidenceStoreRefreshStateFile  string `yaml:"evidenceStoreRefreshStateFile"`
@@ -98,6 +99,7 @@ func defaultConfig() Config {
 		Model:                          "qwen2.5:0.5b",
 		PrometheusURL:                  "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
 		IncidentReleaseFreshnessWindow: DefaultIncidentReleaseFreshnessWindowText,
+		IncidentStoreDB:                filepath.Join(os.TempDir(), "s-sentinel-incident-store", "incidents.db"),
 		HealthAddr:                     ":8080",
 		Targets: []Target{
 			{
@@ -135,6 +137,11 @@ func loadConfig(path string) (Config, error) {
 	}
 	if cfg.EvidenceStoreDB == "" {
 		cfg.EvidenceStoreDB = filepath.Join(os.TempDir(), "s-sentinel-evidence-store", "portal-evidence-store.db")
+	}
+	if configured := strings.TrimSpace(os.Getenv("S_SENTINEL_INCIDENT_STORE_DB")); configured != "" {
+		cfg.IncidentStoreDB = configured
+	} else if cfg.IncidentStoreDB == "" {
+		cfg.IncidentStoreDB = def.IncidentStoreDB
 	}
 	if cfg.EvidenceStoreScriptFile == "" {
 		cfg.EvidenceStoreScriptFile = filepath.Join(cfg.RepoDir, "scripts", "evidence-store.py")

@@ -1,6 +1,6 @@
 import type { RuntimeSnapshot, ServiceSLOStatus } from "@/types/service"
 
-export type IncidentStatus = "ACTIVE" | "RECOVERING" | "RESOLVED" | "UNKNOWN"
+export type IncidentStatus = "ACTIVE" | "MITIGATING" | "RECOVERING" | "RESOLVED" | "UNKNOWN"
 export type IncidentSeverity = "SEV1" | "SEV2" | "SEV3" | "SEV4"
 
 export type IncidentSignal = {
@@ -27,13 +27,16 @@ export type IncidentReleaseEvidence = {
 }
 
 export type IncidentTimelineEvent = {
+  id?: string
   type: string
   message: string
   occurredAt: string
+  payload?: Record<string, unknown>
 }
 
 export type ReliabilityIncident = {
   id: string
+  fingerprint?: string
   service: string
   status: IncidentStatus
   severity: IncidentSeverity
@@ -48,6 +51,13 @@ export type ReliabilityIncident = {
   timeline: IncidentTimelineEvent[]
   startedAt: string
   observedAt: string
+  firstObservedAt?: string
+  lastObservedAt?: string
+  mitigationStartedAt?: string
+  recoveringAt?: string
+  resolvedAt?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type IncidentsResponse = {
@@ -67,3 +77,5 @@ export type ActiveIncidentResponse = {
   service: string
   incident: ReliabilityIncident | null
 }
+
+export type IncidentTimelineResponse = { schemaVersion: string; incidentId: string; items: IncidentTimelineEvent[] }

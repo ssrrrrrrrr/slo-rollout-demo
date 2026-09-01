@@ -63,7 +63,7 @@ function App() {
 
   const incidentsQuery = useQuery({
     queryKey: ["incidents"],
-    queryFn: fetchIncidents,
+    queryFn: () => fetchIncidents(true),
     refetchInterval: 15000,
   })
 

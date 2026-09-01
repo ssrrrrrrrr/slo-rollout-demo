@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"time"
 )
 
 type IncidentService struct {
@@ -10,6 +12,14 @@ type IncidentService struct {
 	sloService     *SLOService
 	runtimeService *RuntimeService
 	detector       IncidentDetector
+	lifecycle      *IncidentLifecycleService
+}
+type currentIncidentObservation struct {
+	Candidate      *ReliabilityIncident
+	ProvidersKnown bool
+	SLO            ServiceSLOStatus
+	Runtime        RuntimeSnapshot
+	LatestRelease  *ServiceReleaseSummary
 }
 
 func NewIncidentService(serviceService *ServiceService, sloService *SLOService, runtimeService *RuntimeService, detector IncidentDetector) *IncidentService {
@@ -25,22 +35,43 @@ func (api *portalAPI) incidentService() *IncidentService {
 	if api.incidentSvc != nil {
 		return api.incidentSvc
 	}
-	return NewIncidentService(api.serviceService(), api.sloService(), api.runtimeService(), NewReliabilityIncidentDetectorWithFreshnessWindow(incidentReleaseFreshnessWindow(api.cfg.IncidentReleaseFreshnessWindow)))
+	svc := NewIncidentService(api.serviceService(), api.sloService(), api.runtimeService(), NewReliabilityIncidentDetectorWithFreshnessWindow(incidentReleaseFreshnessWindow(api.cfg.IncidentReleaseFreshnessWindow)))
+	repo, err := NewSQLiteIncidentRepository(api.cfg.IncidentStoreDB)
+	if err != nil {
+		log.Printf("incident persistence unavailable; using observation-only behavior: %v", err)
+	} else {
+		svc.lifecycle = NewIncidentLifecycleService(svc, repo)
+		api.operationService().lifecycle = svc.lifecycle
+	}
+	api.incidentSvc = svc
+	return svc
 }
 
 func (svc *IncidentService) ActiveForService(ctx context.Context, r *http.Request, serviceName string) (*ReliabilityIncident, error) {
+	if svc.lifecycle != nil {
+		return svc.lifecycle.ReconcileService(ctx, r, serviceName)
+	}
+	observation, err := svc.observe(ctx, r, serviceName)
+	return observation.Candidate, err
+}
+
+// observe is the detector-facing half of incident handling. It deliberately
+// has no persistence or state-transition responsibility.
+func (svc *IncidentService) observe(ctx context.Context, r *http.Request, serviceName string) (currentIncidentObservation, error) {
 	service, err := svc.serviceService.find(serviceName)
 	if err != nil {
-		return nil, err
+		return currentIncidentObservation{}, err
 	}
 
 	slo, err := svc.sloService.Evaluate(ctx, serviceName)
+	providersKnown := err == nil && slo.Status != SLOStatusUnknown
 	if err != nil {
-		return nil, err
+		slo = ServiceSLOStatus{Service: serviceName, Status: SLOStatusUnknown, Reason: "SLO provider is unavailable", EvaluatedAt: time.Now().UTC().Format(time.RFC3339)}
 	}
 	runtime, err := svc.runtimeService.Snapshot(ctx, serviceName)
+	providersKnown = providersKnown && err == nil && runtime.Status != RuntimeStatusUnknown
 	if err != nil {
-		return nil, err
+		runtime = RuntimeSnapshot{Service: serviceName, Status: RuntimeStatusUnknown, Reason: "Runtime provider is unavailable", ObservedAt: time.Now().UTC().Format(time.RFC3339)}
 	}
 
 	var latestRelease *ServiceReleaseSummary
@@ -50,12 +81,13 @@ func (svc *IncidentService) ActiveForService(ctx context.Context, r *http.Reques
 		latestRelease, _ = svc.serviceService.latestRelease(r, serviceName)
 	}
 
-	return svc.Detect(IncidentDetectionInput{
+	candidate := svc.Detect(IncidentDetectionInput{
 		Service:       service,
 		SLO:           slo,
 		Runtime:       runtime,
 		LatestRelease: latestRelease,
-	}), nil
+	})
+	return currentIncidentObservation{Candidate: candidate, ProvidersKnown: providersKnown, SLO: slo, Runtime: runtime, LatestRelease: latestRelease}, nil
 }
 
 // Detect reuses the existing IncidentDetector when a caller already has the
@@ -73,9 +105,37 @@ func (svc *IncidentService) IsCurrentRelease(release *ServiceReleaseSummary) boo
 }
 
 func (svc *IncidentService) List(ctx context.Context, r *http.Request) ([]ReliabilityIncident, error) {
+	return svc.ListWithQuery(ctx, r, IncidentListQuery{})
+}
+func (svc *IncidentService) ListWithQuery(ctx context.Context, r *http.Request, query IncidentListQuery) ([]ReliabilityIncident, error) {
 	services, err := svc.serviceService.Load()
 	if err != nil {
 		return nil, err
+	}
+	if svc.lifecycle != nil {
+		if query.Service != "" {
+			_, err := svc.lifecycle.ReconcileService(ctx, r, query.Service)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for _, service := range services {
+				if _, err := svc.lifecycle.ReconcileService(ctx, r, service.Metadata.Name); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return svc.lifecycle.repository.List(ctx, query)
+	}
+	if query.Service != "" {
+		incident, err := svc.ActiveForService(ctx, r, query.Service)
+		if err != nil {
+			return nil, err
+		}
+		if incident == nil {
+			return []ReliabilityIncident{}, nil
+		}
+		return []ReliabilityIncident{*incident}, nil
 	}
 
 	incidents := make([]ReliabilityIncident, 0, len(services))
@@ -92,6 +152,16 @@ func (svc *IncidentService) List(ctx context.Context, r *http.Request) ([]Reliab
 }
 
 func (svc *IncidentService) Get(ctx context.Context, r *http.Request, id string) (*ReliabilityIncident, error) {
+	if svc.lifecycle != nil {
+		incident, err := svc.lifecycle.repository.Get(ctx, id)
+		if err != nil {
+			if missing, ok := err.(*IncidentNotFoundError); ok {
+				missing.ID = id
+			}
+			return nil, err
+		}
+		return svc.lifecycle.withTimeline(ctx, incident)
+	}
 	incidents, err := svc.List(ctx, r)
 	if err != nil {
 		return nil, err
@@ -102,6 +172,36 @@ func (svc *IncidentService) Get(ctx context.Context, r *http.Request, id string)
 		}
 	}
 	return nil, &IncidentNotFoundError{ID: id}
+}
+
+func (svc *IncidentService) Timeline(ctx context.Context, id string) ([]IncidentTimelineEvent, error) {
+	if svc.lifecycle == nil {
+		return nil, &IncidentNotFoundError{ID: id}
+	}
+	if _, err := svc.lifecycle.repository.Get(ctx, id); err != nil {
+		return nil, err
+	}
+	return svc.lifecycle.repository.ListEvents(ctx, id)
+}
+func (svc *IncidentService) RecordRecoveryApproval(ctx context.Context, id string, plan RecoveryPlan) {
+	if svc.lifecycle != nil {
+		svc.lifecycle.RecoveryApproved(ctx, id, plan)
+	}
+}
+func (svc *IncidentService) RecordRecoveryVerification(ctx context.Context, id string, verification RecoveryVerification) {
+	if svc.lifecycle != nil {
+		svc.lifecycle.RecoveryVerification(ctx, id, verification)
+	}
+}
+func (svc *IncidentService) RecordRemediationVerification(ctx context.Context, id string, verification RemediationVerification) {
+	if svc.lifecycle != nil {
+		svc.lifecycle.RemediationVerification(ctx, id, verification)
+	}
+}
+func (svc *IncidentService) RecordAgentAnalysis(ctx context.Context, id string, diagnosis AgentDiagnosis) {
+	if svc.lifecycle != nil {
+		svc.lifecycle.AgentAnalysisCompleted(ctx, id, diagnosis)
+	}
 }
 
 type IncidentNotFoundError struct {

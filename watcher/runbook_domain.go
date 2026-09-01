@@ -70,12 +70,14 @@ type RecoveryTarget struct {
 	Name      string `json:"name"`
 }
 type RecoveryPlan struct {
-	ID         string             `json:"id"`
-	IncidentID string             `json:"incidentId"`
-	Service    string             `json:"service"`
-	Status     RecoveryPlanStatus `json:"status"`
-	Reason     string             `json:"reason,omitempty"`
-	Diagnosis  struct {
+	OperationID string             `json:"operationId,omitempty"`
+	ID          string             `json:"id"`
+	IncidentID  string             `json:"incidentId"`
+	Service     string             `json:"service"`
+	ReleaseID   string             `json:"releaseId,omitempty"`
+	Status      RecoveryPlanStatus `json:"status"`
+	Reason      string             `json:"reason,omitempty"`
+	Diagnosis   struct {
 		Category string `json:"category"`
 		Reason   string `json:"reason"`
 	} `json:"diagnosis"`
