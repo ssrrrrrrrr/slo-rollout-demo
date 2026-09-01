@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -35,21 +38,24 @@ type Config struct {
 	Rollout   string   `yaml:"rollout"`
 	Targets   []Target `yaml:"targets"`
 
-	Interval                       string `yaml:"interval"`
-	Mode                           string `yaml:"mode"`
-	RepoDir                        string `yaml:"repoDir"`
-	ReportDir                      string `yaml:"reportDir"`
-	StateFile                      string `yaml:"stateFile"`
-	EvidenceStoreDB                string `yaml:"evidenceStoreDB"`
-	IncidentStoreDB                string `yaml:"incidentStoreDB"`
-	EvidenceStoreScriptFile        string `yaml:"evidenceStoreScriptFile"`
-	EvidenceStorePython            string `yaml:"evidenceStorePython"`
-	EvidenceStoreRefreshStateFile  string `yaml:"evidenceStoreRefreshStateFile"`
-	OllamaURL                      string `yaml:"ollamaUrl"`
-	Model                          string `yaml:"model"`
-	PrometheusURL                  string `yaml:"prometheusUrl"`
-	IncidentReleaseFreshnessWindow string `yaml:"incidentReleaseFreshnessWindow"`
-	HealthAddr                     string `yaml:"healthAddr"`
+	Interval                        string `yaml:"interval"`
+	Mode                            string `yaml:"mode"`
+	RepoDir                         string `yaml:"repoDir"`
+	ReportDir                       string `yaml:"reportDir"`
+	StateFile                       string `yaml:"stateFile"`
+	EvidenceStoreDB                 string `yaml:"evidenceStoreDB"`
+	IncidentStoreDB                 string `yaml:"incidentStoreDB"`
+	EvidenceStoreScriptFile         string `yaml:"evidenceStoreScriptFile"`
+	EvidenceStorePython             string `yaml:"evidenceStorePython"`
+	EvidenceStoreRefreshStateFile   string `yaml:"evidenceStoreRefreshStateFile"`
+	OllamaURL                       string `yaml:"ollamaUrl"`
+	Model                           string `yaml:"model"`
+	PrometheusURL                   string `yaml:"prometheusUrl"`
+	IncidentReleaseFreshnessWindow  string `yaml:"incidentReleaseFreshnessWindow"`
+	ReliabilityControllerEnabled    bool   `yaml:"reliabilityControllerEnabled"`
+	ReliabilityReconcileInterval    string `yaml:"reliabilityReconcileInterval"`
+	ReliabilityReconcileConcurrency int    `yaml:"reliabilityReconcileConcurrency"`
+	HealthAddr                      string `yaml:"healthAddr"`
 }
 
 type WatchEvent struct {
@@ -91,16 +97,19 @@ var (
 
 func defaultConfig() Config {
 	return Config{
-		Interval:                       "10s",
-		RepoDir:                        "/root/slo-rollout-demo",
-		StateFile:                      "/root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json",
-		EvidenceStorePython:            "python3",
-		OllamaURL:                      "http://127.0.0.1:11434",
-		Model:                          "qwen2.5:0.5b",
-		PrometheusURL:                  "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
-		IncidentReleaseFreshnessWindow: DefaultIncidentReleaseFreshnessWindowText,
-		IncidentStoreDB:                filepath.Join(os.TempDir(), "s-sentinel-incident-store", "incidents.db"),
-		HealthAddr:                     ":8080",
+		Interval:                        "10s",
+		RepoDir:                         "/root/slo-rollout-demo",
+		StateFile:                       "/root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json",
+		EvidenceStorePython:             "python3",
+		OllamaURL:                       "http://127.0.0.1:11434",
+		Model:                           "qwen2.5:0.5b",
+		PrometheusURL:                   "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
+		IncidentReleaseFreshnessWindow:  DefaultIncidentReleaseFreshnessWindowText,
+		IncidentStoreDB:                 filepath.Join(os.TempDir(), "s-sentinel-incident-store", "incidents.db"),
+		ReliabilityControllerEnabled:    true,
+		ReliabilityReconcileInterval:    DefaultReliabilityReconcileInterval.String(),
+		ReliabilityReconcileConcurrency: DefaultReliabilityReconcileConcurrency,
+		HealthAddr:                      ":8080",
 		Targets: []Target{
 			{
 				Namespace: "slo-rollout",
@@ -172,6 +181,23 @@ func loadConfig(path string) (Config, error) {
 	if cfg.IncidentReleaseFreshnessWindow == "" {
 		cfg.IncidentReleaseFreshnessWindow = def.IncidentReleaseFreshnessWindow
 	}
+	if configured := strings.TrimSpace(os.Getenv("S_SENTINEL_RELIABILITY_CONTROLLER_ENABLED")); configured != "" {
+		cfg.ReliabilityControllerEnabled = strings.EqualFold(configured, "true")
+	}
+	if configured := strings.TrimSpace(os.Getenv("S_SENTINEL_RELIABILITY_RECONCILE_INTERVAL")); configured != "" {
+		cfg.ReliabilityReconcileInterval = configured
+	}
+	if configured := strings.TrimSpace(os.Getenv("S_SENTINEL_RELIABILITY_RECONCILE_CONCURRENCY")); configured != "" {
+		if value, err := strconv.Atoi(configured); err == nil {
+			cfg.ReliabilityReconcileConcurrency = value
+		}
+	}
+	if cfg.ReliabilityReconcileInterval == "" {
+		cfg.ReliabilityReconcileInterval = def.ReliabilityReconcileInterval
+	}
+	if cfg.ReliabilityReconcileConcurrency <= 0 {
+		cfg.ReliabilityReconcileConcurrency = def.ReliabilityReconcileConcurrency
+	}
 	if cfg.HealthAddr == "" {
 		cfg.HealthAddr = def.HealthAddr
 	}
@@ -195,9 +221,12 @@ func loadConfig(path string) (Config, error) {
 }
 
 func startHealthServer(addr string, cfg Config) {
+	startHealthServerForAPI(addr, newPortalAPI(cfg))
+}
+func startHealthServerForAPI(addr string, api *portalAPI) {
 	mux := http.NewServeMux()
 
-	registerPortalAPIHandlers(mux, cfg)
+	registerPortalAPIHandlersForAPI(mux, api)
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -970,9 +999,23 @@ func main() {
 		log.Printf("watch target: namespace=%s rollout=%s", target.Namespace, target.Rollout)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	api := newPortalAPI(cfg)
+	incidentService := api.incidentService()
+	if cfg.ReliabilityControllerEnabled && incidentService.lifecycle != nil {
+		reconcileInterval, parseErr := time.ParseDuration(cfg.ReliabilityReconcileInterval)
+		if parseErr != nil || reconcileInterval <= 0 {
+			log.Printf("invalid reliability reconcile interval %q; using %s", cfg.ReliabilityReconcileInterval, DefaultReliabilityReconcileInterval)
+			reconcileInterval = DefaultReliabilityReconcileInterval
+		}
+		api.controller = NewReliabilityController(api.serviceService(), incidentService.lifecycle, true, reconcileInterval, cfg.ReliabilityReconcileConcurrency)
+		go api.controller.Run(ctx)
+	} else if cfg.ReliabilityControllerEnabled {
+		log.Printf("reliability controller disabled: incident lifecycle persistence is unavailable")
+	}
 
-	go startHealthServer(cfg.HealthAddr, cfg)
+	go startHealthServerForAPI(cfg.HealthAddr, api)
 
 	log.Printf("watcher is running in watch-only mode")
 	runWatchLoop(ctx, client, cfg, interval)

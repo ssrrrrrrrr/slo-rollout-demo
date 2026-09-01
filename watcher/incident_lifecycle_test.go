@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -159,6 +163,179 @@ func TestDurableIncidentAPIHistoryAndTimeline(t *testing.T) {
 	if history["count"] != float64(1) {
 		t.Fatalf("resolved history query: %#v", history)
 	}
+}
+
+func TestLifecycleSerializesConcurrentSameServiceReconcile(t *testing.T) {
+	h := newDurableIncidentHarness(t)
+	defer h.repo.Close()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var calls int32
+	h.lifecycle.beforeReconcile = func(_ context.Context, _ string) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			close(entered)
+			<-release
+		}
+	}
+	results := make(chan *ReliabilityIncident, 2)
+	failures := make(chan error, 2)
+	for range 2 {
+		go func() {
+			incident, err := h.lifecycle.ReconcileService(context.Background(), httptest.NewRequest(http.MethodGet, "/", nil), "demo-app")
+			if err != nil {
+				failures <- err
+				return
+			}
+			results <- incident
+		}()
+	}
+	<-entered
+	close(release)
+	first, second := <-results, <-results
+	select {
+	case err := <-failures:
+		t.Fatal(err)
+	default:
+	}
+	if first == nil || second == nil || first.ID != second.ID {
+		t.Fatalf("same fingerprint must retain one episode: %#v %#v", first, second)
+	}
+	active, _ := h.repo.FindActiveByService(context.Background(), "demo-app")
+	if len(active) != 1 {
+		t.Fatalf("concurrent reconcile created duplicate episodes: %#v", active)
+	}
+	events, _ := h.repo.ListEvents(context.Background(), first.ID)
+	if incidentEventCount(events, "INCIDENT_DETECTED") != 1 {
+		t.Fatalf("duplicate incident timeline event: %#v", events)
+	}
+}
+
+func TestLifecycleAllowsDifferentServiceReconcileConcurrency(t *testing.T) {
+	h := newDurableIncidentHarness(t)
+	defer h.repo.Close()
+	payment := strings.ReplaceAll(testServiceConfig, "demo-app", "payment-service")
+	if err := os.WriteFile(filepath.Join(h.service.serviceService.configDir, "payment.service.yaml"), []byte(payment), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan string, 2)
+	permits := map[string]chan struct{}{
+		"demo-app":        make(chan struct{}),
+		"payment-service": make(chan struct{}),
+	}
+	h.lifecycle.beforeReconcile = func(_ context.Context, name string) {
+		entered <- name
+		<-permits[name]
+	}
+	type reconcileResult struct {
+		name string
+		err  error
+	}
+	done := make(chan reconcileResult, 2)
+	for _, name := range []string{"demo-app", "payment-service"} {
+		go func(name string) {
+			_, err := h.lifecycle.ReconcileService(context.Background(), httptest.NewRequest(http.MethodGet, "/", nil), name)
+			done <- reconcileResult{name: name, err: err}
+		}(name)
+	}
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case name := <-entered:
+			seen[name] = true
+		case <-time.After(time.Second):
+			t.Fatal("different services were globally serialized")
+		}
+	}
+	// Both transactions have entered their independent service gates. Let the
+	// SQLite-backed test fixture persist them one at a time; SQLite's writer
+	// serialization is unrelated to the lifecycle service-keyed gates.
+	for _, name := range []string{"demo-app", "payment-service"} {
+		close(permits[name])
+		result := <-done
+		if result.name != name || result.err != nil {
+			t.Fatalf("reconcile result = %#v, want successful %s result", result, name)
+		}
+	}
+}
+
+func TestLifecycleReconcileCancellationWhileWaitingForServiceGate(t *testing.T) {
+	h := newDurableIncidentHarness(t)
+	defer h.repo.Close()
+	entered, release := make(chan struct{}), make(chan struct{})
+	h.lifecycle.beforeReconcile = func(_ context.Context, _ string) {
+		select {
+		case <-entered:
+		default:
+			close(entered)
+			<-release
+		}
+	}
+	first := make(chan error, 1)
+	go func() {
+		_, err := h.lifecycle.ReconcileService(context.Background(), httptest.NewRequest(http.MethodGet, "/", nil), "demo-app")
+		first <- err
+	}()
+	<-entered
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	_, err := h.lifecycle.ReconcileService(ctx, httptest.NewRequest(http.MethodGet, "/", nil), "demo-app")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("waiting reconcile did not honor context cancellation: %v", err)
+	}
+	close(release)
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestControllerAndManualReconcileShareServiceGate(t *testing.T) {
+	h := newDurableIncidentHarness(t)
+	defer h.repo.Close()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var calls int32
+	h.lifecycle.beforeReconcile = func(_ context.Context, _ string) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			close(entered)
+			<-release
+		}
+	}
+	controller := NewReliabilityController(h.service.serviceService, h.lifecycle, true, time.Hour, 1)
+	controllerDone := make(chan struct{})
+	go func() { controller.ReconcileOnce(context.Background()); close(controllerDone) }()
+	<-entered
+	type manualResult struct {
+		status int
+	}
+	manual := make(chan manualResult, 1)
+	api := &portalAPI{incidentSvc: h.service}
+	go func() {
+		recorder := httptest.NewRecorder()
+		api.handleManualServiceReconcile(recorder, httptest.NewRequest(http.MethodPost, "/", nil), "demo-app")
+		manual <- manualResult{status: recorder.Code}
+	}()
+	close(release)
+	<-controllerDone
+	result := <-manual
+	if result.status != http.StatusOK {
+		t.Fatalf("manual reconcile status = %d, want %d", result.status, http.StatusOK)
+	}
+	active, _ := h.repo.FindActiveByService(context.Background(), "demo-app")
+	if len(active) != 1 {
+		t.Fatalf("controller/manual race created duplicate episode: %#v", active)
+	}
+	events, _ := h.repo.ListEvents(context.Background(), active[0].ID)
+	if incidentEventCount(events, "INCIDENT_DETECTED") != 1 {
+		t.Fatalf("controller/manual race duplicated incident timeline event: %#v", events)
+	}
+}
+
+func incidentEventCount(events []IncidentTimelineEvent, wanted string) int {
+	count := 0
+	for _, event := range events {
+		if event.Type == wanted {
+			count++
+		}
+	}
+	return count
 }
 
 func containsIncidentEvent(events []IncidentTimelineEvent, wanted string) bool {

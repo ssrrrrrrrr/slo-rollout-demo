@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -12,16 +13,27 @@ import (
 // durable episodes. It is intentionally invoked by requests today; a future
 // controller only needs to call ReconcileService and adds no new logic.
 type IncidentLifecycleService struct {
-	incidents  *IncidentService
-	repository IncidentRepository
-	now        func() time.Time
+	incidents       *IncidentService
+	repository      IncidentRepository
+	now             func() time.Time
+	serviceLocksMu  sync.Mutex
+	serviceLocks    map[string]chan struct{}
+	beforeReconcile func(context.Context, string)
 }
 
 func NewIncidentLifecycleService(incidents *IncidentService, repository IncidentRepository) *IncidentLifecycleService {
-	return &IncidentLifecycleService{incidents: incidents, repository: repository, now: time.Now}
+	return &IncidentLifecycleService{incidents: incidents, repository: repository, now: time.Now, serviceLocks: map[string]chan struct{}{}}
 }
 
 func (s *IncidentLifecycleService) ReconcileService(ctx context.Context, request *http.Request, serviceName string) (*ReliabilityIncident, error) {
+	release, err := s.lockService(ctx, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if s.beforeReconcile != nil {
+		s.beforeReconcile(ctx, serviceName)
+	}
 	observation, err := s.incidents.observe(ctx, request, serviceName)
 	if err != nil {
 		return nil, err
@@ -99,6 +111,27 @@ func (s *IncidentLifecycleService) ReconcileService(ctx context.Context, request
 		}
 	}
 	return s.withTimeline(ctx, &updated)
+}
+
+// lockService serializes one complete lifecycle transaction per Service while
+// preserving independent reconciliation for other Services.
+func (s *IncidentLifecycleService) lockService(ctx context.Context, serviceName string) (func(), error) {
+	s.serviceLocksMu.Lock()
+	if s.serviceLocks == nil {
+		s.serviceLocks = map[string]chan struct{}{}
+	}
+	gate := s.serviceLocks[serviceName]
+	if gate == nil {
+		gate = make(chan struct{}, 1)
+		s.serviceLocks[serviceName] = gate
+	}
+	s.serviceLocksMu.Unlock()
+	select {
+	case gate <- struct{}{}:
+		return func() { <-gate }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 func (s *IncidentLifecycleService) OperationStarted(ctx context.Context, operation ControlledOperation) {

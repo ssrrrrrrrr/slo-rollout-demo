@@ -48,13 +48,16 @@ func (api *portalAPI) handleServiceList(w http.ResponseWriter, r *http.Request) 
 }
 
 func (api *portalAPI) handleServiceDetail(w http.ResponseWriter, r *http.Request) {
-	if !api.requireGET(w, r) {
-		return
-	}
-
 	name, resource, ok := serviceRoute(r.URL.Path)
 	if !ok {
 		writePortalJSON(w, http.StatusNotFound, map[string]string{"error": "service not found"})
+		return
+	}
+	if resource == "reconcile" {
+		api.handleManualServiceReconcile(w, r, name)
+		return
+	}
+	if !api.requireGET(w, r) {
 		return
 	}
 
@@ -131,7 +134,7 @@ func serviceRoute(path string) (name string, resource string, ok bool) {
 	if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" {
 		return parts[0], "", true
 	}
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && (parts[1] == "releases" || parts[1] == "slo" || parts[1] == "runtime" || parts[1] == "incidents") {
+	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && (parts[1] == "releases" || parts[1] == "slo" || parts[1] == "runtime" || parts[1] == "incidents" || parts[1] == "reconcile") {
 		return parts[0], parts[1], true
 	}
 	if len(parts) == 3 && strings.TrimSpace(parts[0]) != "" && parts[1] == "incidents" && parts[2] == "active" {

@@ -13,6 +13,7 @@ type IncidentService struct {
 	runtimeService *RuntimeService
 	detector       IncidentDetector
 	lifecycle      *IncidentLifecycleService
+	readReconcile  bool
 }
 type currentIncidentObservation struct {
 	Candidate      *ReliabilityIncident
@@ -28,6 +29,7 @@ func NewIncidentService(serviceService *ServiceService, sloService *SLOService, 
 		sloService:     sloService,
 		runtimeService: runtimeService,
 		detector:       detector,
+		readReconcile:  true,
 	}
 }
 
@@ -36,6 +38,7 @@ func (api *portalAPI) incidentService() *IncidentService {
 		return api.incidentSvc
 	}
 	svc := NewIncidentService(api.serviceService(), api.sloService(), api.runtimeService(), NewReliabilityIncidentDetectorWithFreshnessWindow(incidentReleaseFreshnessWindow(api.cfg.IncidentReleaseFreshnessWindow)))
+	svc.readReconcile = !api.cfg.ReliabilityControllerEnabled
 	repo, err := NewSQLiteIncidentRepository(api.cfg.IncidentStoreDB)
 	if err != nil {
 		log.Printf("incident persistence unavailable; using observation-only behavior: %v", err)
@@ -49,6 +52,16 @@ func (api *portalAPI) incidentService() *IncidentService {
 
 func (svc *IncidentService) ActiveForService(ctx context.Context, r *http.Request, serviceName string) (*ReliabilityIncident, error) {
 	if svc.lifecycle != nil {
+		if !svc.readReconcile {
+			if _, err := svc.serviceService.find(serviceName); err != nil {
+				return nil, err
+			}
+			items, err := svc.lifecycle.repository.FindActiveByService(ctx, serviceName)
+			if err != nil {
+				return nil, err
+			}
+			return firstIncident(items), nil
+		}
 		return svc.lifecycle.ReconcileService(ctx, r, serviceName)
 	}
 	observation, err := svc.observe(ctx, r, serviceName)
@@ -113,6 +126,9 @@ func (svc *IncidentService) ListWithQuery(ctx context.Context, r *http.Request, 
 		return nil, err
 	}
 	if svc.lifecycle != nil {
+		if !svc.readReconcile {
+			return svc.lifecycle.repository.List(ctx, query)
+		}
 		if query.Service != "" {
 			_, err := svc.lifecycle.ReconcileService(ctx, r, query.Service)
 			if err != nil {

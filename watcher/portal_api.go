@@ -23,6 +23,7 @@ type portalAPI struct {
 	agentSvc       *ReliabilityAgentService
 	operationSvc   *OperationService
 	overviewSvc    *OverviewService
+	controller     *ReliabilityController
 }
 
 type portalResourceDef struct {
@@ -94,10 +95,10 @@ type portalReleaseDetailResponse struct {
 }
 
 func registerPortalAPIHandlers(mux *http.ServeMux, cfg Config) {
-	api := &portalAPI{
-		cfg:       cfg,
-		reportDir: cfg.ReportDir,
-	}
+	registerPortalAPIHandlersForAPI(mux, newPortalAPI(cfg))
+}
+func newPortalAPI(cfg Config) *portalAPI { return &portalAPI{cfg: cfg, reportDir: cfg.ReportDir} }
+func registerPortalAPIHandlersForAPI(mux *http.ServeMux, api *portalAPI) {
 
 	mux.HandleFunc("/api/releases", api.handleReleaseList)
 	mux.HandleFunc("/api/releases/", api.handleReleaseDetail)
@@ -109,6 +110,7 @@ func registerPortalAPIHandlers(mux *http.ServeMux, cfg Config) {
 	mux.HandleFunc("/api/v1/runbooks", api.handleRunbookList)
 	mux.HandleFunc("/api/v1/runbooks/", api.handleRunbookDetail)
 	mux.HandleFunc("/api/v1/overview", api.handleReliabilityOverview)
+	mux.HandleFunc("/api/v1/controller/status", api.handleControllerStatus)
 
 	mux.HandleFunc("/api/evidence-store/status", api.handleEvidenceStoreStatus)
 	mux.HandleFunc("/api/evidence-store/refresh", api.handleEvidenceStoreRefresh)

@@ -12,6 +12,9 @@ ollamaUrl: http://127.0.0.1:11434
 model: qwen2.5:0.5b
 prometheusUrl: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
 incidentReleaseFreshnessWindow: 1h
+reliabilityControllerEnabled: true
+reliabilityReconcileInterval: 30s
+reliabilityReconcileConcurrency: 4
 
 targets:
   - namespace: slo-rollout
