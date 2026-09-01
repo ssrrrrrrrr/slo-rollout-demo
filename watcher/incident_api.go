@@ -55,6 +55,13 @@ func (api *portalAPI) handleIncidentDetail(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
+	if len(parts) >= 2 && parts[0] != "" && parts[1] == "recovery" {
+		resource := strings.Join(parts[1:], "/")
+		if resource == "recovery" || resource == "recovery/preview" || resource == "recovery/approve" || resource == "recovery/execute" || resource == "recovery/verification" {
+			api.handleIncidentRecovery(w, r, parts[0], resource)
+			return
+		}
+	}
 	if !api.requireGET(w, r) {
 		return
 	}

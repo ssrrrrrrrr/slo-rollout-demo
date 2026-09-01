@@ -17,7 +17,7 @@ data:
     evidenceStoreScriptFile: /app/scripts/evidence-store.py
     evidenceStorePython: python3
     evidenceStoreRefreshStateFile: /app/docs/release-reports/evidence-store/portal-evidence-store-refresh.json
-    ollamaUrl: http://192.168.30.1:11434
+    ollamaUrl: http://ollama:11434
     model: qwen2.5:0.5b
     prometheusUrl: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
     incidentReleaseFreshnessWindow: 1h
@@ -48,7 +48,7 @@ spec:
       serviceAccountName: release-rollout-watcher
       containers:
         - name: watcher
-          image: 192.168.30.11:5000/release-rollout-watcher:v1.28
+          image: registry.local:5000/release-rollout-watcher:v1.28
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

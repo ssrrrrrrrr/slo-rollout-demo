@@ -12,7 +12,7 @@ LATENCY_MS="0"
 OUTPUT_DIR="build/compiled"
 COMPILER_PROFILE=""
 
-REGISTRY="${REGISTRY:-192.168.30.11:30500}"
+REGISTRY="${REGISTRY:-registry.local:5000}"
 IMAGE_NAME="${IMAGE_NAME:-}"
 PROMETHEUS_ADDR="${PROMETHEUS_ADDR:-http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090}"
 PROMETHEUS_RULE_NAMESPACE="${PROMETHEUS_RULE_NAMESPACE:-monitoring}"
@@ -47,7 +47,7 @@ Options:
   -h, --help                Show help
 
 Environment:
-  REGISTRY                  Image registry. Default: 192.168.30.11:30500
+  REGISTRY                  Image registry. Default: registry.local:5000
   IMAGE_NAME                Optional image repository override. Default: SLOConfig spec.runtime.image.repository
   PYTHON_BIN                Python runtime. Default: python3, fallback: python
   PROMETHEUS_ADDR           Prometheus address used by AnalysisTemplate

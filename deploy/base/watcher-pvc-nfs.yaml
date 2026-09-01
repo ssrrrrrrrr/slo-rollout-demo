@@ -14,7 +14,7 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: watcher-nfs
   nfs:
-    server: 192.168.30.11
+    server: nfs.example.invalid
     path: /data/nfs/slo-rollout-watcher/reports
 ---
 apiVersion: v1

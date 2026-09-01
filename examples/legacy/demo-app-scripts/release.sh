@@ -13,7 +13,7 @@ APP_VERSION="$2"
 FAULT_RATE="$3"
 LATENCY_MS="$4"
 
-REGISTRY="192.168.30.11:30500"
+REGISTRY="registry.local:5000"
 IMAGE_NAME="sre/demo-app"
 NAMESPACE="slo-rollout"
 ROLLOUT_NAME="demo-app"

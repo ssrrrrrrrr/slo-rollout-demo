@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -95,6 +96,27 @@ func TestServiceAPI(t *testing.T) {
 			t.Fatalf("expected EvidenceRepository service query, got %#v", repo.lastQuery)
 		}
 	})
+
+	t.Run("service catalog remains available when evidence is unavailable", func(t *testing.T) {
+		unavailableAPI := &portalAPI{
+			serviceSvc: NewServiceService(writeTestServiceConfig(t), &unavailableServiceEvidenceRepository{}),
+		}
+		unavailableMux := http.NewServeMux()
+		unavailableMux.HandleFunc("/api/v1/services", unavailableAPI.handleServiceList)
+		unavailableMux.HandleFunc("/api/v1/services/", unavailableAPI.handleServiceDetail)
+
+		list := callServiceAPI(t, unavailableMux, "/api/v1/services", http.StatusOK)
+		item := list["items"].([]interface{})[0].(map[string]interface{})
+		if item["latestRelease"] != nil {
+			t.Fatalf("expected no latest release when evidence is unavailable, got %#v", item["latestRelease"])
+		}
+
+		detail := callServiceAPI(t, unavailableMux, "/api/v1/services/demo-app", http.StatusOK)
+		service := detail["service"].(map[string]interface{})
+		if service["latestRelease"] != nil {
+			t.Fatalf("expected no latest release when evidence is unavailable, got %#v", service["latestRelease"])
+		}
+	})
 }
 
 func writeTestServiceConfig(t *testing.T) string {
@@ -128,6 +150,34 @@ func callServiceAPI(t *testing.T, handler http.Handler, target string, expectedS
 
 type testServiceEvidenceRepository struct {
 	lastQuery EvidenceReleaseListQuery
+}
+
+type unavailableServiceEvidenceRepository struct{}
+
+func (repo *unavailableServiceEvidenceRepository) Descriptor() EvidenceRepositoryDescriptor {
+	return EvidenceRepositoryDescriptor{}
+}
+
+func (repo *unavailableServiceEvidenceRepository) ListReleases(*http.Request, EvidenceReleaseListQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, errors.New("evidence store is unavailable")
+}
+func (repo *unavailableServiceEvidenceRepository) GetRelease(*http.Request, EvidenceReleaseQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
+}
+func (repo *unavailableServiceEvidenceRepository) GetObject(*http.Request, EvidenceObjectQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
+}
+func (repo *unavailableServiceEvidenceRepository) ListArtifacts(*http.Request, EvidenceArtifactListQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
+}
+func (repo *unavailableServiceEvidenceRepository) SearchObjects(*http.Request, EvidenceSearchQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
+}
+func (repo *unavailableServiceEvidenceRepository) GetVerificationSummary(*http.Request, EvidenceVerificationSummaryQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
+}
+func (repo *unavailableServiceEvidenceRepository) GetGraph(*http.Request, EvidenceGraphQuery) (*EvidenceRepositoryResponse, error) {
+	return nil, nil
 }
 
 func (repo *testServiceEvidenceRepository) Descriptor() EvidenceRepositoryDescriptor {

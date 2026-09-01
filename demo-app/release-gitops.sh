@@ -15,7 +15,7 @@ LATENCY_MS="$4"
 
 S_SENTINEL_ENV="${S_SENTINEL_ENV:-dev}"
 
-REGISTRY="192.168.30.11:30500"
+REGISTRY="registry.local:5000"
 IMAGE_NAME="sre/demo-app"
 NAMESPACE="slo-rollout"
 ROLLOUT_NAME="demo-app"

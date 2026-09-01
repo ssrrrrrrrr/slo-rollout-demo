@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: demo-app
-        image: 192.168.30.11:30500/sre/demo-app:runtime-pause-test-20260527-170724
+        image: registry.local:5000/sre/demo-app:runtime-pause-test-20260527-170724
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

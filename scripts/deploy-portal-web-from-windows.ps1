@@ -1,5 +1,5 @@
 ﻿param(
-  [string]$VmHost = "192.168.30.11",
+  [string]$VmHost = "s-sentinel-host",
   [string]$VmUser = "root",
   [string]$RepoDir = "/root/slo-rollout-demo"
 )

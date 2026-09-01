@@ -67,7 +67,7 @@ jobs:
           SLO_ERROR_RATE_THRESHOLD: "${{ github.event.inputs.slo_error_rate_threshold }}"
           SLO_P95_SECONDS_THRESHOLD: "${{ github.event.inputs.slo_p95_seconds_threshold }}"
           SLO_MIN_REQUEST_COUNT: "${{ github.event.inputs.slo_min_request_count }}"
-          PROM_ADDR: "http://10.102.31.98:9090"
+          PROM_ADDR: "http://prometheus:9090"
         run: |
           cd "$GITHUB_WORKSPACE/demo-app"
           chmod +x release-gitops.sh

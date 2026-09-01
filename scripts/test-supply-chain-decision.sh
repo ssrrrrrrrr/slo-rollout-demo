@@ -34,7 +34,7 @@ cat > "$GOOD_CONTEXT" <<'JSON'
   "changeContext": {
     "commit": "abc1234",
     "image": {
-      "current": "192.168.30.11:30500/sre/demo-app:v11-actions",
+      "current": "registry.local:5000/sre/demo-app:v11-actions",
       "digest": "sha256:1111222233334444"
     }
   }
@@ -110,7 +110,7 @@ cat > "$RISKY_CONTEXT" <<'JSON'
   "env": "dev",
   "changeContext": {
     "image": {
-      "current": "192.168.30.11:30500/sre/demo-app:latest"
+      "current": "registry.local:5000/sre/demo-app:latest"
     }
   }
 }

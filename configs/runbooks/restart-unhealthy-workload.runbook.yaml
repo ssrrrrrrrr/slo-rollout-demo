@@ -1,0 +1,17 @@
+apiVersion: sentinel.io/v1alpha1
+kind: Runbook
+metadata:
+  name: restart-unhealthy-workload
+spec:
+  description: Restart an unhealthy configured workload.
+  match:
+    runtimeStatus: [UNHEALTHY]
+    requireRelease: false
+  action:
+    type: RESTART_WORKLOAD
+  risk:
+    level: MEDIUM
+  approval:
+    required: true
+  verification:
+    runtimeStatus: HEALTHY

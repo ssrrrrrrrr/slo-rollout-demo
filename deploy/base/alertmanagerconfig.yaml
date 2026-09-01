@@ -22,5 +22,5 @@ spec:
   receivers:
     - name: release-webhook
       webhookConfigs:
-        - url: http://192.168.30.11:18080/alertmanager
+        - url: http://alertmanager:18080/alertmanager
           sendResolved: false

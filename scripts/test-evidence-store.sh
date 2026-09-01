@@ -255,7 +255,7 @@ cat > "$FIXTURE_DIR/supply-chain-decision-$RELEASE_ID.json" <<JSON
     "releaseResult": "FAIL_BY_MULTIPLE_SLO"
   },
   "image": {
-    "image": "192.168.30.11:30500/sre/demo-app:v-test",
+    "image": "registry.local:5000/sre/demo-app:v-test",
     "imageTag": "v-test",
     "imageDigest": null
   },
@@ -271,11 +271,11 @@ cat > "$FIXTURE_DIR/supply-chain-decision-$RELEASE_ID.json" <<JSON
     "toolBinary": "/tmp/ssentinel-missing-cosign",
     "toolAvailable": false,
     "command": null,
-    "commandPreview": ["/tmp/ssentinel-missing-cosign", "verify", "192.168.30.11:30500/sre/demo-app:v-test"],
+    "commandPreview": ["/tmp/ssentinel-missing-cosign", "verify", "registry.local:5000/sre/demo-app:v-test"],
     "exitCode": null,
     "checkedAt": "2026-01-01T00:00:05Z",
     "subject": {
-      "image": "192.168.30.11:30500/sre/demo-app:v-test",
+      "image": "registry.local:5000/sre/demo-app:v-test",
       "imageDigest": null
     },
     "results": {

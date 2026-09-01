@@ -94,7 +94,7 @@ func defaultConfig() Config {
 		RepoDir:                        "/root/slo-rollout-demo",
 		StateFile:                      "/root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json",
 		EvidenceStorePython:            "python3",
-		OllamaURL:                      "http://192.168.30.1:11434",
+		OllamaURL:                      "http://127.0.0.1:11434",
 		Model:                          "qwen2.5:0.5b",
 		PrometheusURL:                  "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
 		IncidentReleaseFreshnessWindow: DefaultIncidentReleaseFreshnessWindowText,

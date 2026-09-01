@@ -1,0 +1,17 @@
+apiVersion: sentinel.io/v1alpha1
+kind: Runbook
+metadata:
+  name: rollback-failed-release
+spec:
+  description: Delegate an approved failed-release rollback to the existing pipeline.
+  match:
+    runtimeStatus: [UNHEALTHY]
+    requireRelease: true
+  action:
+    type: ROLLBACK_RELEASE
+  risk:
+    level: HIGH
+  approval:
+    required: true
+  verification:
+    runtimeStatus: HEALTHY

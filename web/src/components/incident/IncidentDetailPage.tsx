@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react"
 import { KeyValueRows } from "@/components/common/KeyValueRows"
 import { Panel } from "@/components/common/Panel"
 import { IncidentRemediationPanel } from "@/components/incident/IncidentRemediationPanel"
+import { IncidentRecoveryPanel } from "@/components/incident/IncidentRecoveryPanel"
 import type { ReliabilityIncident } from "@/types/incident"
 import { formatTime } from "@/utils/format"
 
@@ -75,6 +76,7 @@ export function IncidentDetailPage({ incident, onOpenRelease }: { incident: Reli
       ) : null}
 
       <IncidentRemediationPanel incidentId={incident.id} />
+      <IncidentRecoveryPanel incidentId={incident.id} />
 
       <Panel>
         <h4 className="text-sm font-semibold text-slate-100">Timeline</h4>

@@ -9,7 +9,7 @@ const portalStateCopy: Record<PortalStateKind, { tone: PanelTone; message: strin
   },
   error: {
     tone: "danger",
-    message: "Release Portal API 暂不可用。请检查 port-forward、后端服务状态，或 Vite proxy 是否指向 http://192.168.30.11:18090。",
+    message: "Release Portal API 暂不可用。请检查 port-forward、后端服务状态，或 Vite proxy 是否指向本地后端地址。",
   },
   empty: {
     tone: "muted",

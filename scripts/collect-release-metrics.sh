@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PROM_ADDR="${PROM_ADDR:-http://10.102.31.98:9090}"
+PROM_ADDR="${PROM_ADDR:-http://prometheus:9090}"
 NAMESPACE="${NAMESPACE:-slo-rollout}"
 IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required}"
 

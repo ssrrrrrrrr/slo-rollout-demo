@@ -46,7 +46,7 @@ echo
 echo "===== compile dry output for release script inputs ====="
 rm -rf "$TEST_OUT"
 
-REGISTRY="192.168.30.11:30500" \
+REGISTRY="registry.local:5000" \
 ./scripts/compile-release-config.sh \
   --env dev \
   --service demo-app \
@@ -65,7 +65,7 @@ test -f "$TEST_OUT/dev/rendered-release-plan.json"
 
 grep -q 'successCondition: result\[0\] <= 5' "$TEST_OUT/dev/analysis.yaml"
 grep -q 'successCondition: isNaN(result\[0\]) || result\[0\] <= 0.5' "$TEST_OUT/dev/analysis.yaml"
-grep -q 'image: 192.168.30.11:30500/sre/demo-app:v36-release-integration' "$TEST_OUT/dev/rollout.yaml"
+grep -q 'image: registry.local:5000/sre/demo-app:v36-release-integration' "$TEST_OUT/dev/rollout.yaml"
 grep -q 'alert: DemoAppCanaryP95LatencySLOViolation' "$TEST_OUT/dev/prometheusrule.yaml"
 grep -q '> 0.5' "$TEST_OUT/dev/prometheusrule.yaml"
 

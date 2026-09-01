@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import path from "path"
 
 const releasePortalTarget =
-  process.env.VITE_RELEASE_PORTAL_TARGET ?? "http://192.168.30.11:18090"
+  process.env.VITE_RELEASE_PORTAL_TARGET ?? "http://127.0.0.1:18090"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

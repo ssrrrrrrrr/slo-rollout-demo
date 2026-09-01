@@ -72,8 +72,8 @@
       "commitMessage": "feat: generate change context for gitops releases"
     },
     "image": {
-      "previous": "192.168.30.11:30500/sre/demo-app:v11-actions",
-      "current": "192.168.30.11:30500/sre/demo-app:v11-actions",
+      "previous": "registry.local:5000/sre/demo-app:v11-actions",
+      "current": "registry.local:5000/sre/demo-app:v11-actions",
       "changed": false
     },
     "riskLevel": "low"

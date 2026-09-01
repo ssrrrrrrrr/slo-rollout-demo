@@ -7,7 +7,7 @@ evidenceStoreDB: /tmp/s-sentinel-evidence-store/portal-evidence-store.db
 evidenceStoreScriptFile: /root/slo-rollout-demo/scripts/evidence-store.py
 evidenceStorePython: python3
 evidenceStoreRefreshStateFile: /tmp/s-sentinel-evidence-store/portal-evidence-store-refresh.json
-ollamaUrl: http://192.168.30.1:11434
+ollamaUrl: http://127.0.0.1:11434
 model: qwen2.5:0.5b
 prometheusUrl: http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090
 incidentReleaseFreshnessWindow: 1h

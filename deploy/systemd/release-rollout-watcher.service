@@ -9,7 +9,7 @@ ExecStart=/root/slo-rollout-demo/watcher/release-rollout-watcher \
   --namespace slo-rollout \
   --rollout demo-app \
   --repo-dir /root/slo-rollout-demo \
-  --ollama-url http://192.168.30.1:11434 \
+  --ollama-url http://127.0.0.1:11434 \
   --model qwen2.5:3b \
   --interval 10s
 Restart=always

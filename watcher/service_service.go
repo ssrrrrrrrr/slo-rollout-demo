@@ -74,10 +74,11 @@ func (svc *ServiceService) List(r *http.Request) ([]ServiceSummary, error) {
 
 	summaries := make([]ServiceSummary, 0, len(services))
 	for _, service := range services {
-		latestRelease, err := svc.latestRelease(r, service.Metadata.Name)
-		if err != nil {
-			return nil, err
-		}
+		// Release evidence enriches a service summary, but it is not required to
+		// discover a configured Service. An uninitialised or temporarily
+		// unavailable EvidenceRepository must therefore leave latestRelease empty
+		// instead of turning the whole Service catalog into a 500 response.
+		latestRelease, _ := svc.latestRelease(r, service.Metadata.Name)
 		summaries = append(summaries, service.Summary(latestRelease))
 	}
 
@@ -90,10 +91,8 @@ func (svc *ServiceService) Get(r *http.Request, name string) (ServiceSummary, er
 		return ServiceSummary{}, err
 	}
 
-	latestRelease, err := svc.latestRelease(r, service.Metadata.Name)
-	if err != nil {
-		return ServiceSummary{}, err
-	}
+	// See List: release evidence is optional enrichment for Service metadata.
+	latestRelease, _ := svc.latestRelease(r, service.Metadata.Name)
 
 	return service.Summary(latestRelease), nil
 }

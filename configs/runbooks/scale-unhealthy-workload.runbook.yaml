@@ -1,0 +1,22 @@
+apiVersion: sentinel.io/v1alpha1
+kind: Runbook
+metadata:
+  name: scale-unhealthy-workload
+spec:
+  description: Conservatively scale an unhealthy configured workload.
+  match:
+    runtimeStatus: [UNHEALTHY]
+    requireRelease: false
+  action:
+    type: SCALE_WORKLOAD
+    parameters:
+      direction: UP
+      step: 1
+      minReplicas: 1
+      maxReplicas: 6
+  risk:
+    level: MEDIUM
+  approval:
+    required: true
+  verification:
+    runtimeStatus: HEALTHY
