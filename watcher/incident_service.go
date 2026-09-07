@@ -44,7 +44,7 @@ func (api *portalAPI) incidentService() *IncidentService {
 		log.Printf("incident persistence unavailable; using observation-only behavior: %v", err)
 	} else {
 		svc.lifecycle = NewIncidentLifecycleService(svc, repo)
-		api.operationService().lifecycle = svc.lifecycle
+		api.operationService().incidentLifecycle = svc.lifecycle
 	}
 	api.incidentSvc = svc
 	return svc

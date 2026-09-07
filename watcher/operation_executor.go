@@ -54,14 +54,22 @@ func (a ReleaseRuntimeActionExecutorAdapter) Execute(ctx context.Context, op Con
 		OperationPauseRelease: "PAUSE", OperationResumeRelease: "RESUME", OperationPromoteRelease: "PROMOTE",
 		OperationAbortRelease: "ABORT", OperationRollbackRelease: "ROLLBACK",
 	}[op.Action]
-	result, err := a.adapter.Execute(ctx, RemediationExecutionRequest{ReleaseID: op.Target.ReleaseID, Action: action})
+	intent := op.ExecutionIntent
+	releaseID := intent.ReleaseID
+	if releaseID == "" {
+		releaseID = op.Target.ReleaseID
+	}
+	if intent.Action != "" && intent.Action != op.Action {
+		return OperationExecutionResult{}, fmt.Errorf("release operation execution intent action does not match operation")
+	}
+	result, err := a.adapter.Execute(ctx, RemediationExecutionRequest{ReleaseID: releaseID, Action: action})
 	state := OperationExecutionState{Status: result.Status, Executor: "release-runtime-action", StartedAt: result.StartedAt, FinishedAt: result.FinishedAt, Reason: result.Reason, ExternalResultID: result.ResultID}
 	if state.Status == "" {
 		state.Status = "FAILED"
 	}
 	return OperationExecutionResult{
 		Execution:      state,
-		ExternalTarget: OperationTarget{ReleaseID: op.Target.ReleaseID, Namespace: result.Target.Namespace, WorkloadName: result.Target.Workload},
+		ExternalTarget: OperationTarget{ReleaseID: releaseID, Namespace: result.Target.Namespace, WorkloadName: result.Target.Workload},
 		PostState:      result.PostState, ActionVerified: result.ActionVerified,
 	}, err
 }
@@ -82,7 +90,11 @@ func (a KubernetesRecoveryExecutorAdapter) Execute(ctx context.Context, op Contr
 	if op.Action == OperationScaleWorkload {
 		action = RecoveryScaleWorkload
 	}
-	plan := RecoveryPlan{Action: RunbookAction{Type: action, Parameters: op.Parameters}, Target: RecoveryTarget{Namespace: op.Target.Namespace, Kind: op.Target.WorkloadKind, Name: op.Target.WorkloadName}}
+	intent := op.ExecutionIntent
+	if intent.Action != "" && intent.Action != op.Action {
+		return OperationExecutionResult{}, fmt.Errorf("recovery operation execution intent action does not match operation")
+	}
+	plan := RecoveryPlan{Action: RunbookAction{Type: action, Parameters: op.Parameters}, Target: RecoveryTarget{Namespace: intent.Target.Namespace, Kind: intent.Target.WorkloadKind, Name: intent.Target.WorkloadName}}
 	if err := a.executor.Preflight(ctx, plan); err != nil {
 		return OperationExecutionResult{Execution: OperationExecutionState{Status: "BLOCKED", Executor: "kubernetes-recovery", Reason: err.Error()}}, err
 	}
@@ -90,9 +102,9 @@ func (a KubernetesRecoveryExecutorAdapter) Execute(ctx context.Context, op Contr
 	var replicas int64
 	var err error
 	if executor, ok := a.executor.(interface {
-		ExecutePreflighted(context.Context, RecoveryPlan) (int64, error)
+		ExecuteOperation(context.Context, ControlledOperation) (int64, error)
 	}); ok {
-		replicas, err = executor.ExecutePreflighted(ctx, plan)
+		replicas, err = executor.ExecuteOperation(ctx, op)
 	} else {
 		replicas, err = a.executor.Execute(ctx, plan)
 	}

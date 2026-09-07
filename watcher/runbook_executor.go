@@ -53,40 +53,83 @@ func (e *KubernetesRecoveryExecutor) Execute(ctx context.Context, p RecoveryPlan
 // adapter. It preserves the established mutation algorithm while allowing the
 // adapter to avoid evaluating the same preflight twice.
 func (e *KubernetesRecoveryExecutor) ExecutePreflighted(ctx context.Context, p RecoveryPlan) (int64, error) {
-	resource := e.client.Resource(rolloutGVR).Namespace(p.Target.Namespace)
-	rollout, err := resource.Get(ctx, p.Target.Name, metav1.GetOptions{})
+	intent := OperationExecutionIntent{Action: recoveryOperationAction(p.Action.Type), Target: OperationTarget{Namespace: p.Target.Namespace, WorkloadKind: p.Target.Kind, WorkloadName: p.Target.Name}}
+	if p.Action.Type == RecoveryRestartWorkload {
+		intent.RestartAt = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+	if p.Action.Type == RecoveryScaleWorkload {
+		rollout, err := e.client.Resource(rolloutGVR).Namespace(p.Target.Namespace).Get(ctx, p.Target.Name, metav1.GetOptions{})
+		if err != nil {
+			return 0, err
+		}
+		current := rolloutReplicas(rollout)
+		target := boundedScaleTarget(current, p.Action.Parameters)
+		if target == current {
+			return target, fmt.Errorf("scale target is already within its configured bound")
+		}
+		intent.InitialReplicas, intent.TargetReplicas = &current, &target
+	}
+	return e.executeIntent(ctx, intent)
+}
+
+// ExecuteOperation consumes the immutable Operation intent written before
+// EXECUTING. It is the production ledger path and never regenerates restartAt
+// or a scale target.
+func (e *KubernetesRecoveryExecutor) ExecuteOperation(ctx context.Context, op ControlledOperation) (int64, error) {
+	p := RecoveryPlan{Action: RunbookAction{Type: RecoveryRestartWorkload}, Target: RecoveryTarget{Namespace: op.ExecutionIntent.Target.Namespace, Kind: op.ExecutionIntent.Target.WorkloadKind, Name: op.ExecutionIntent.Target.WorkloadName}}
+	if op.Action == OperationScaleWorkload {
+		p.Action.Type = RecoveryScaleWorkload
+	}
+	if err := e.Preflight(ctx, p); err != nil {
+		return 0, err
+	}
+	return e.executeIntent(ctx, op.ExecutionIntent)
+}
+
+func (e *KubernetesRecoveryExecutor) executeIntent(ctx context.Context, intent OperationExecutionIntent) (int64, error) {
+	target := intent.Target
+	if target.Namespace == "" || target.WorkloadKind != "Rollout" || target.WorkloadName == "" {
+		return 0, fmt.Errorf("operation execution intent has no configured Rollout target")
+	}
+	resource := e.client.Resource(rolloutGVR).Namespace(target.Namespace)
+	rollout, err := resource.Get(ctx, target.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
-	switch p.Action.Type {
-	case RecoveryRestartWorkload:
-		if err := unstructured.SetNestedField(rollout.Object, time.Now().UTC().Format(time.RFC3339), "spec", "restartAt"); err != nil {
+	switch intent.Action {
+	case OperationRestartWorkload:
+		if intent.RestartAt == "" {
+			return 0, fmt.Errorf("restart execution intent has no fixed restartAt")
+		}
+		if err := unstructured.SetNestedField(rollout.Object, intent.RestartAt, "spec", "restartAt"); err != nil {
 			return 0, err
 		}
 		_, err = resource.Update(ctx, rollout, metav1.UpdateOptions{})
 		return rolloutReplicas(rollout), err
-	case RecoveryScaleWorkload:
-		current := rolloutReplicas(rollout)
-		params := p.Action.Parameters
-		target := current + params.Step
-		if params.Direction == "DOWN" {
-			target = current - params.Step
+	case OperationScaleWorkload:
+		if intent.TargetReplicas == nil {
+			return 0, fmt.Errorf("scale execution intent has no fixed targetReplicas")
 		}
-		if target < params.MinReplicas {
-			target = params.MinReplicas
-		}
-		if target > params.MaxReplicas {
-			target = params.MaxReplicas
-		}
-		if target == current {
-			return target, fmt.Errorf("scale target is already within its configured bound")
-		}
-		if err := unstructured.SetNestedField(rollout.Object, target, "spec", "replicas"); err != nil {
+		if err := unstructured.SetNestedField(rollout.Object, *intent.TargetReplicas, "spec", "replicas"); err != nil {
 			return 0, err
 		}
 		_, err = resource.Update(ctx, rollout, metav1.UpdateOptions{})
-		return target, err
+		return *intent.TargetReplicas, err
 	}
 	return 0, fmt.Errorf("unsupported recovery action")
+}
+
+func boundedScaleTarget(current int64, params RecoveryActionParameters) int64 {
+	target := current + params.Step
+	if params.Direction == "DOWN" {
+		target = current - params.Step
+	}
+	if target < params.MinReplicas {
+		target = params.MinReplicas
+	}
+	if target > params.MaxReplicas {
+		target = params.MaxReplicas
+	}
+	return target
 }
 func rolloutReplicas(o *unstructured.Unstructured) int64 { return getInt64(o, "spec", "replicas") }

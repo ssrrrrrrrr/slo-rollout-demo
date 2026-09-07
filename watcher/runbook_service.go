@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"hash/fnv"
@@ -10,8 +11,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
-	"time"
 )
 
 type RecoveryExecutor interface {
@@ -28,9 +27,6 @@ type RecoveryService struct {
 	executor        RecoveryExecutor
 	rollback        *RemediationService
 	operation       *OperationService
-	mu              sync.Mutex
-	executions      map[string]RecoveryExecution
-	approvals       map[string]RecoveryApprovalState
 	agent           *ReliabilityAgentService
 }
 
@@ -41,7 +37,7 @@ func NewRecoveryService(incidents *IncidentService, runtime *RuntimeService, ser
 		KubernetesRecoveryExecutorAdapter{executor: executor},
 	))
 	rollback.operation = operation
-	return &RecoveryService{incidentService: incidents, runtimeService: runtime, services: services, runbookDir: filepath.Join(repoDir, "configs", "runbooks"), planner: DeterministicRecoveryPlanner{}, executor: executor, rollback: rollback, operation: operation, executions: map[string]RecoveryExecution{}, approvals: map[string]RecoveryApprovalState{}}
+	return &RecoveryService{incidentService: incidents, runtimeService: runtime, services: services, runbookDir: filepath.Join(repoDir, "configs", "runbooks"), planner: DeterministicRecoveryPlanner{}, executor: executor, rollback: rollback, operation: operation}
 }
 func (api *portalAPI) recoveryService() *RecoveryService {
 	if api.recoverySvc != nil {
@@ -119,7 +115,7 @@ func (svc *RecoveryService) Plan(ctx context.Context, r *http.Request, id string
 	plan.Action = book.Spec.Action
 	plan.Risk = book.Spec.Risk.Level
 	plan.ID = recoveryPlanID(id, book.Metadata.Name, plan.Target)
-	plan.Approval = RemediationApproval{Required: book.Spec.Approval.Required, Approved: svc.approvedFor(plan)}
+	plan.Approval = RemediationApproval{Required: book.Spec.Approval.Required}
 	plan.Policy = RemediationPolicy{Decision: firstNonEmpty(os.Getenv("S_SENTINEL_RECOVERY_POLICY_DECISION"), "REQUIRE_APPROVAL"), Reason: "recovery policy evaluation"}
 	plan.Preflight = recoveryEligibility(plan)
 	plan.BlockedReasons = plan.Preflight.BlockingReasons
@@ -129,11 +125,15 @@ func (svc *RecoveryService) Plan(ctx context.Context, r *http.Request, id string
 		plan.Status = RecoveryPlanBlocked
 		plan.Reason = plan.Preflight.Reason
 	}
-	plan.OperationID = recoveryControlledOperation(plan, svc.approvalFor(plan), nil).ID
-	if execution := svc.executionFor(plan.OperationID); execution != nil {
-		plan.Execution = execution
-		v, _ := svc.verify(ctx, plan, *execution)
-		plan.Verification = &v
+	plan.OperationID = recoveryControlledOperation(plan, nil, nil).ID
+	svc.projectDurableOperation(ctx, &plan)
+	plan.Preflight = recoveryEligibility(plan)
+	plan.BlockedReasons = plan.Preflight.BlockingReasons
+	if plan.Preflight.Eligible {
+		plan.Status = RecoveryPlanReady
+	} else {
+		plan.Status = RecoveryPlanBlocked
+		plan.Reason = plan.Preflight.Reason
 	}
 	plan.PlannerSource = "DETERMINISTIC"
 	if svc.agent != nil {
@@ -174,17 +174,17 @@ func recoveryEligibility(plan RecoveryPlan) RemediationEligibility {
 	return RemediationEligibility{Eligible: true, BlockingReasons: []string{}}
 }
 func (svc *RecoveryService) approvedFor(plan RecoveryPlan) bool {
-	return svc.approvalFor(plan) != nil
+	return false
 }
 func (svc *RecoveryService) approvalFor(plan RecoveryPlan) *RecoveryApprovalState {
-	svc.mu.Lock()
-	defer svc.mu.Unlock()
-	state, ok := svc.approvals[plan.ID]
-	if !ok || !state.Approved || state.PlanID != plan.ID || state.IncidentID != plan.IncidentID || state.Service != plan.Service || state.Action != plan.Action.Type || state.Target != plan.Target {
+	if svc.operation == nil || plan.OperationID == "" {
 		return nil
 	}
-	copy := state
-	return &copy
+	op, err := svc.operation.Get(context.Background(), plan.OperationID)
+	if err != nil || !op.Approval.Approved {
+		return nil
+	}
+	return &RecoveryApprovalState{PlanID: plan.ID, IncidentID: plan.IncidentID, Service: plan.Service, Action: plan.Action.Type, Target: plan.Target, Approved: true, ApprovedAt: recoveryApprovalTime(op.Approval)}
 }
 func (svc *RecoveryService) Approve(ctx context.Context, r *http.Request, incidentID, planID string) (RecoveryPlan, error) {
 	plan, err := svc.Plan(ctx, r, incidentID)
@@ -197,9 +197,13 @@ func (svc *RecoveryService) Approve(ctx context.Context, r *http.Request, incide
 	if plan.Runbook == nil || plan.Status == RecoveryPlanNotActionable {
 		return plan, &RemediationRequestError{StatusCode: 409, Message: "no actionable recovery plan is available"}
 	}
-	svc.mu.Lock()
-	svc.approvals[plan.ID] = RecoveryApprovalState{PlanID: plan.ID, IncidentID: plan.IncidentID, Service: plan.Service, Action: plan.Action.Type, Target: plan.Target, Approved: true, ApprovedAt: time.Now().UTC().Format(time.RFC3339)}
-	svc.mu.Unlock()
+	op, err := svc.prepareOperationIntent(ctx, plan, nil)
+	if err != nil {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: err.Error()}
+	}
+	if _, err := svc.operation.ApproveRecovery(ctx, op, plan.ID); err != nil {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: err.Error()}
+	}
 	approved, err := svc.Plan(ctx, r, incidentID)
 	if err == nil {
 		svc.incidentService.RecordRecoveryApproval(ctx, incidentID, approved)
@@ -234,28 +238,33 @@ func (svc *RecoveryService) Execute(ctx context.Context, r *http.Request, id, pl
 		}
 		releasePlan = &candidate
 	}
-	op := recoveryControlledOperation(plan, svc.approvalFor(plan), releasePlan)
-	plan.OperationID = op.ID
-	svc.mu.Lock()
-	if x, ok := svc.executions[op.IdempotencyKey]; ok {
-		x.Idempotent = true
-		plan.Execution = &x
-		svc.mu.Unlock()
-		return plan, nil
+	op, err := svc.prepareOperationIntent(ctx, plan, releasePlan)
+	if err != nil {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: err.Error()}
 	}
-	svc.mu.Unlock()
+	plan.OperationID = op.ID
+	previous, _ := svc.operation.Get(ctx, op.ID)
 	result, err := svc.operation.Execute(ctx, op)
+	var ledgerErr *OperationLedgerError
+	if errors.As(err, &ledgerErr) {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: ledgerErr.Error()}
+	}
 	x := RecoveryExecution{RequestKey: op.IdempotencyKey, Action: plan.Action.Type, ExpectedReplicas: result.ExpectedReplicas, Status: result.Execution.Status, Reason: result.Execution.Reason}
 	if err != nil {
 		x.Status = "FAILED"
 		x.Reason = err.Error()
 	}
-	svc.mu.Lock()
-	svc.executions[op.IdempotencyKey] = x
-	svc.mu.Unlock()
+	if previous != nil && previous.State != OperationStatePlanned && previous.State != OperationStateWaitingApproval {
+		x.Idempotent = true
+	}
 	plan.Execution = &x
+	if x.Status == "UNKNOWN" {
+		plan.Verification = &RecoveryVerification{Status: RecoveryVerificationUnknown, Reason: firstNonEmpty(x.Reason, "durable operation execution state is unknown")}
+		return plan, nil
+	}
 	v, _ := svc.verify(ctx, plan, x)
 	plan.Verification = &v
+	_, _ = svc.operation.RecordVerification(ctx, op.ID, operationVerificationFromRecovery(v))
 	svc.incidentService.RecordRecoveryVerification(ctx, id, v)
 	return plan, nil
 }
@@ -267,7 +276,11 @@ func (svc *RecoveryService) Verification(ctx context.Context, r *http.Request, i
 	if plan.Execution == nil {
 		return RecoveryVerification{Status: RecoveryVerificationPending, Reason: "no recovery execution has been recorded"}, nil
 	}
-	return svc.verify(ctx, plan, *plan.Execution)
+	verification, err := svc.verify(ctx, plan, *plan.Execution)
+	if err == nil && plan.OperationID != "" {
+		_, _ = svc.operation.RecordVerification(ctx, plan.OperationID, operationVerificationFromRecovery(verification))
+	}
+	return verification, err
 }
 func (svc *RecoveryService) verify(ctx context.Context, plan RecoveryPlan, x RecoveryExecution) (RecoveryVerification, error) {
 	if x.Status != "SUCCEEDED" {
@@ -286,12 +299,93 @@ func (svc *RecoveryService) verify(ctx context.Context, plan RecoveryPlan, x Rec
 	}
 	return RecoveryVerification{Status: RecoveryVerificationRecovering, RuntimeStatus: snap.Status, Reason: "runtime action completed while workloads are still reconciling"}, nil
 }
-func (svc *RecoveryService) executionFor(id string) *RecoveryExecution {
-	svc.mu.Lock()
-	defer svc.mu.Unlock()
-	x, ok := svc.executions[id]
-	if !ok {
+func (svc *RecoveryService) projectDurableOperation(ctx context.Context, plan *RecoveryPlan) {
+	if svc.operation == nil || plan.OperationID == "" {
+		return
+	}
+	op, err := svc.operation.Get(ctx, plan.OperationID)
+	if err != nil {
+		return
+	}
+	plan.Approval.Approved = op.Approval.Approved
+	if op.Execution.Status != "" {
+		plan.Execution = &RecoveryExecution{RequestKey: op.ID, Action: plan.Action.Type, ExpectedReplicas: op.Execution.ExpectedReplicas, Status: op.Execution.Status, Reason: op.Execution.Reason}
+	}
+	if op.Verification.Status != "" {
+		plan.Verification = recoveryVerificationFromOperation(op.Verification)
+	}
+}
+
+func (svc *RecoveryService) prepareOperationIntent(ctx context.Context, plan RecoveryPlan, releasePlan *RemediationPlan) (ControlledOperation, error) {
+	op := recoveryControlledOperation(plan, svc.approvalFor(plan), releasePlan)
+	if existing, err := svc.operation.Get(ctx, op.ID); err == nil {
+		if err := svc.operationIntentStillValid(ctx, plan, *existing); err != nil {
+			return ControlledOperation{}, err
+		}
+		// Keep the current policy/preflight/approval projection fresh while
+		// taking the immutable intent exclusively from the durable record.
+		op.ExecutionIntent = existing.ExecutionIntent
+		return op, nil
+	}
+	if op.Action != OperationScaleWorkload {
+		return op, nil
+	}
+	snapshot, err := svc.runtimeService.Snapshot(ctx, plan.Service)
+	if err != nil || snapshot.Status == RuntimeStatusUnknown {
+		return ControlledOperation{}, fmt.Errorf("scale operation intent cannot be frozen because runtime state is unavailable")
+	}
+	current := snapshot.Workload.DesiredReplicas
+	target := boundedScaleTarget(current, plan.Action.Parameters)
+	if target == current {
+		return ControlledOperation{}, fmt.Errorf("scale target is already within its configured bound")
+	}
+	op.ExecutionIntent = OperationExecutionIntent{Action: op.Action, Target: op.Target, InitialReplicas: &current, TargetReplicas: &target}
+	return op, nil
+}
+
+// operationIntentStillValid is a fresh execution gate: it verifies current
+// service semantics without ever replacing the durable intent with a newly
+// calculated value.
+func (svc *RecoveryService) operationIntentStillValid(ctx context.Context, plan RecoveryPlan, operation ControlledOperation) error {
+	intent := operation.ExecutionIntent
+	if intent.Action != operation.Action || intent.Target.Namespace != plan.Target.Namespace || intent.Target.WorkloadKind != plan.Target.Kind || intent.Target.WorkloadName != plan.Target.Name {
+		return fmt.Errorf("durable operation intent no longer matches the current service runtime target")
+	}
+	if operation.Action == OperationRollbackRelease && intent.ReleaseID != plan.ReleaseID {
+		return fmt.Errorf("durable release operation intent no longer matches the current related release")
+	}
+	if operation.Action != OperationScaleWorkload {
 		return nil
 	}
-	return &x
+	if intent.InitialReplicas == nil || intent.TargetReplicas == nil {
+		return fmt.Errorf("durable scale operation intent is incomplete")
+	}
+	if *intent.TargetReplicas < plan.Action.Parameters.MinReplicas || *intent.TargetReplicas > plan.Action.Parameters.MaxReplicas {
+		return fmt.Errorf("durable scale target is outside the current safety bounds")
+	}
+	snapshot, err := svc.runtimeService.Snapshot(ctx, plan.Service)
+	if err != nil || snapshot.Status == RuntimeStatusUnknown {
+		return fmt.Errorf("scale operation intent cannot be validated because runtime state is unavailable")
+	}
+	if snapshot.Workload.DesiredReplicas != *intent.InitialReplicas {
+		return fmt.Errorf("durable scale operation intent is stale because current replicas changed")
+	}
+	return nil
+}
+
+func recoveryApprovalTime(approval OperationApprovalState) string {
+	for _, check := range approval.RequiredChecks {
+		if check.Type == "RECOVERY_APPROVAL" && check.Approved {
+			return check.ApprovedAt
+		}
+	}
+	return ""
+}
+
+func operationVerificationFromRecovery(v RecoveryVerification) OperationVerificationState {
+	return OperationVerificationState{Status: string(v.Status), Reason: v.Reason, RuntimeStatus: v.RuntimeStatus}
+}
+
+func recoveryVerificationFromOperation(v OperationVerificationState) *RecoveryVerification {
+	return &RecoveryVerification{Status: RecoveryVerificationStatus(v.Status), RuntimeStatus: v.RuntimeStatus, Reason: v.Reason}
 }

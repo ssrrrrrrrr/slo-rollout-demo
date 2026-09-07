@@ -45,6 +45,7 @@ type Config struct {
 	StateFile                       string `yaml:"stateFile"`
 	EvidenceStoreDB                 string `yaml:"evidenceStoreDB"`
 	IncidentStoreDB                 string `yaml:"incidentStoreDB"`
+	OperationStoreDB                string `yaml:"operationStoreDB"`
 	EvidenceStoreScriptFile         string `yaml:"evidenceStoreScriptFile"`
 	EvidenceStorePython             string `yaml:"evidenceStorePython"`
 	EvidenceStoreRefreshStateFile   string `yaml:"evidenceStoreRefreshStateFile"`
@@ -106,6 +107,7 @@ func defaultConfig() Config {
 		PrometheusURL:                   "http://prometheus-stack-kube-prom-prometheus.monitoring.svc.cluster.local:9090",
 		IncidentReleaseFreshnessWindow:  DefaultIncidentReleaseFreshnessWindowText,
 		IncidentStoreDB:                 filepath.Join(os.TempDir(), "s-sentinel-incident-store", "incidents.db"),
+		OperationStoreDB:                filepath.Join(os.TempDir(), "s-sentinel-operation-store", "operations.db"),
 		ReliabilityControllerEnabled:    true,
 		ReliabilityReconcileInterval:    DefaultReliabilityReconcileInterval.String(),
 		ReliabilityReconcileConcurrency: DefaultReliabilityReconcileConcurrency,
@@ -151,6 +153,11 @@ func loadConfig(path string) (Config, error) {
 		cfg.IncidentStoreDB = configured
 	} else if cfg.IncidentStoreDB == "" {
 		cfg.IncidentStoreDB = def.IncidentStoreDB
+	}
+	if configured := strings.TrimSpace(os.Getenv("S_SENTINEL_OPERATION_STORE_DB")); configured != "" {
+		cfg.OperationStoreDB = configured
+	} else if cfg.OperationStoreDB == "" {
+		cfg.OperationStoreDB = def.OperationStoreDB
 	}
 	if cfg.EvidenceStoreScriptFile == "" {
 		cfg.EvidenceStoreScriptFile = filepath.Join(cfg.RepoDir, "scripts", "evidence-store.py")
@@ -1003,6 +1010,7 @@ func main() {
 	defer cancel()
 	api := newPortalAPI(cfg)
 	incidentService := api.incidentService()
+	api.operationService().ReconcileInFlightOperations(ctx)
 	if cfg.ReliabilityControllerEnabled && incidentService.lifecycle != nil {
 		reconcileInterval, parseErr := time.ParseDuration(cfg.ReliabilityReconcileInterval)
 		if parseErr != nil || reconcileInterval <= 0 {

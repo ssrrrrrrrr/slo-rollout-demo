@@ -90,6 +90,113 @@ func (s *OperationLifecycleService) Transition(ctx context.Context, operationID 
 	return operation, nil
 }
 
+// RefreshConditions persists the current policy, approval and preflight
+// snapshots before execution without changing the frozen execution intent.
+// It is deliberately unavailable after READY so a caller cannot rewrite the
+// conditions of an in-flight or completed operation.
+func (s *OperationLifecycleService) RefreshConditions(ctx context.Context, operationID string, proposed ControlledOperation) (*ControlledOperation, error) {
+	operation, err := s.repository.Get(ctx, operationID)
+	if err != nil {
+		return nil, err
+	}
+	if operation.State != OperationStatePlanned && operation.State != OperationStateWaitingApproval && operation.State != OperationStateReady {
+		return operation, nil
+	}
+	if !sameOperationDefinition(*operation, proposed) {
+		return nil, fmt.Errorf("current operation action or target differs from durable operation")
+	}
+	operation.Policy = proposed.Policy
+	operation.Preflight = proposed.Preflight
+	operation.Approval = mergeOperationApproval(operation.Approval, proposed.Approval)
+	operation.UpdatedAt = s.now().UTC()
+	if err := s.repository.Update(ctx, *operation); err != nil {
+		return nil, err
+	}
+	return operation, nil
+}
+
+// ApproveRecovery persists the exact recovery approval on the canonical
+// operation. The operation identity carries the incident/action/target
+// binding; the supplied planID is retained in the approval check subject.
+func (s *OperationLifecycleService) ApproveRecovery(ctx context.Context, operationID, planID string, approvedAt time.Time, approvedBy string) (*ControlledOperation, error) {
+	operation, err := s.repository.Get(ctx, operationID)
+	if err != nil {
+		return nil, err
+	}
+	if operation.State != OperationStatePlanned && operation.State != OperationStateWaitingApproval {
+		return nil, fmt.Errorf("operation %s cannot be approved in state %s", operationID, operation.State)
+	}
+	matched := false
+	for index := range operation.Approval.RequiredChecks {
+		check := &operation.Approval.RequiredChecks[index]
+		if check.Type == "RECOVERY_APPROVAL" && check.SubjectID == planID {
+			check.Approved, check.ApprovedAt, check.ApprovedBy = true, approvedAt.UTC().Format(time.RFC3339), approvedBy
+			matched = true
+		}
+	}
+	if !matched {
+		return nil, fmt.Errorf("operation recovery approval does not match the current plan")
+	}
+	operation.Approval = operationApproval(operation.ID, operation.Approval.RequiredChecks)
+	operation.UpdatedAt = s.now().UTC()
+	if err := s.repository.Update(ctx, *operation); err != nil {
+		return nil, err
+	}
+	if err := s.appendEvent(ctx, *operation, "APPROVED", "Recovery approval persisted", map[string]interface{}{"planId": planID}); err != nil {
+		return nil, err
+	}
+	return operation, nil
+}
+
+func (s *OperationLifecycleService) RecordExecution(ctx context.Context, operationID string, result OperationExecutionResult, executionErr error) (*ControlledOperation, error) {
+	operation, err := s.repository.Get(ctx, operationID)
+	if err != nil {
+		return nil, err
+	}
+	operation.Execution = operationExecutionSummary(result, executionErr)
+	operation.UpdatedAt = s.now().UTC()
+	if err := s.repository.Update(ctx, *operation); err != nil {
+		return nil, err
+	}
+	if executionErr != nil || operation.Execution.Status == "FAILED" || operation.Execution.Status == "BLOCKED" {
+		return s.Transition(ctx, operationID, OperationStateFailed, "EXECUTION_FAILED", firstNonEmpty(operation.Execution.Reason, "operation execution failed"), nil)
+	}
+	if operation.Execution.Status == "UNKNOWN" {
+		return s.Transition(ctx, operationID, OperationStateUnknown, "EXECUTION_STATE_UNKNOWN", firstNonEmpty(operation.Execution.Reason, "operation execution result is unknown"), nil)
+	}
+	return s.Transition(ctx, operationID, OperationStateSucceeded, "EXECUTION_SUCCEEDED", "Operation executor returned successfully", nil)
+}
+
+func (s *OperationLifecycleService) RecordVerification(ctx context.Context, operationID string, verification OperationVerificationState) (*ControlledOperation, error) {
+	operation, err := s.repository.Get(ctx, operationID)
+	if err != nil {
+		return nil, err
+	}
+	if operation.State == OperationStateSucceeded {
+		operation, err = s.Transition(ctx, operationID, OperationStateVerifying, "VERIFICATION_STARTED", "Durable verification started", nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if operation.State != OperationStateVerifying && operation.State != OperationStateRecovering {
+		return operation, nil
+	}
+	operation.Verification, operation.UpdatedAt = verification, s.now().UTC()
+	if err := s.repository.Update(ctx, *operation); err != nil {
+		return nil, err
+	}
+	switch verification.Status {
+	case "RECOVERED":
+		return s.Transition(ctx, operationID, OperationStateRecovered, "RECOVERED", firstNonEmpty(verification.Reason, "Operation verified recovered"), nil)
+	case "RECOVERING":
+		return s.Transition(ctx, operationID, OperationStateRecovering, "RECOVERING", firstNonEmpty(verification.Reason, "Operation is recovering"), nil)
+	case "FAILED":
+		return s.Transition(ctx, operationID, OperationStateFailed, "EXECUTION_FAILED", firstNonEmpty(verification.Reason, "Operation verification failed"), nil)
+	default:
+		return s.Transition(ctx, operationID, OperationStateUnknown, "EXECUTION_STATE_UNKNOWN", firstNonEmpty(verification.Reason, "Operation verification is unknown"), nil)
+	}
+}
+
 // ReconcileInFlight only reconciles states that may have been interrupted by
 // a process crash. It never executes a mutation and never handles approvals
 // or planning state.
@@ -101,7 +208,7 @@ func (s *OperationLifecycleService) ReconcileInFlight(ctx context.Context, opera
 	switch operation.State {
 	case OperationStateSucceeded, OperationStateVerifying, OperationStateRecovering:
 		return operation, nil
-	case OperationStateExecuting:
+	case OperationStateExecuting, OperationStateUnknown:
 		// continue below
 	default:
 		return operation, nil
@@ -111,7 +218,15 @@ func (s *OperationLifecycleService) ReconcileInFlight(ctx context.Context, opera
 	}
 	inspection, inspectErr := s.inspector.Inspect(ctx, *operation)
 	if inspectErr != nil {
+		if operation.State == OperationStateUnknown {
+			return operation, nil
+		}
 		return s.markUnknown(ctx, *operation, "external execution state cannot be determined: "+inspectErr.Error(), "")
+	}
+	if operation.State == OperationStateUnknown {
+		// UNKNOWN is never a retry path. Re-inspection is permitted for
+		// observability only and does not silently advance or execute it.
+		return operation, nil
 	}
 	switch inspection.Status {
 	case OperationInspectionApplied:
@@ -192,6 +307,33 @@ func materializeOperationIntent(operation ControlledOperation, now time.Time) (O
 
 func sameOperationDefinition(existing, requested ControlledOperation) bool {
 	return existing.ID == requested.ID && existing.Source == requested.Source && existing.Subject == requested.Subject && existing.Action == requested.Action && reflect.DeepEqual(existing.Target, requested.Target) && (reflect.DeepEqual(requested.ExecutionIntent, OperationExecutionIntent{}) || reflect.DeepEqual(existing.ExecutionIntent, requested.ExecutionIntent))
+}
+
+func mergeOperationApproval(existing, proposed OperationApprovalState) OperationApprovalState {
+	if len(proposed.RequiredChecks) == 0 {
+		return proposed
+	}
+	checks := append([]OperationApprovalCheck{}, proposed.RequiredChecks...)
+	for index := range checks {
+		for _, durable := range existing.RequiredChecks {
+			if checks[index].Type == durable.Type && checks[index].SubjectID == durable.SubjectID && durable.Approved {
+				checks[index].Approved, checks[index].ApprovedAt, checks[index].ApprovedBy = true, durable.ApprovedAt, durable.ApprovedBy
+			}
+		}
+	}
+	return operationApproval(proposed.SubjectID, checks)
+}
+
+func operationExecutionSummary(result OperationExecutionResult, executionErr error) OperationExecutionState {
+	state := result.Execution
+	state.ExpectedReplicas, state.ExternalTarget, state.PostState, state.ActionVerified = result.ExpectedReplicas, result.ExternalTarget, result.PostState, result.ActionVerified
+	if executionErr != nil {
+		state.Status, state.Reason = "FAILED", executionErr.Error()
+	}
+	if state.Status == "" {
+		state.Status = "FAILED"
+	}
+	return state
 }
 
 func isOperationNotFound(err error) bool {

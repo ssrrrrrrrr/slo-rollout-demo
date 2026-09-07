@@ -65,12 +65,16 @@ type OperationPreflightState struct {
 }
 
 type OperationExecutionState struct {
-	Status           string `json:"status"`
-	Executor         string `json:"executor,omitempty"`
-	StartedAt        string `json:"startedAt,omitempty"`
-	FinishedAt       string `json:"finishedAt,omitempty"`
-	Reason           string `json:"reason,omitempty"`
-	ExternalResultID string `json:"externalResultId,omitempty"`
+	Status           string                 `json:"status"`
+	Executor         string                 `json:"executor,omitempty"`
+	StartedAt        string                 `json:"startedAt,omitempty"`
+	FinishedAt       string                 `json:"finishedAt,omitempty"`
+	Reason           string                 `json:"reason,omitempty"`
+	ExternalResultID string                 `json:"externalResultId,omitempty"`
+	ExpectedReplicas int64                  `json:"expectedReplicas,omitempty"`
+	ExternalTarget   OperationTarget        `json:"externalTarget,omitempty"`
+	PostState        map[string]interface{} `json:"postState,omitempty"`
+	ActionVerified   bool                   `json:"actionVerified"`
 }
 
 // OperationLifecycleState is the durable lifecycle of a controlled operation.
@@ -102,6 +106,7 @@ type OperationExecutionIntent struct {
 	ReleaseID             string          `json:"releaseId,omitempty"`
 	RuntimeActionIdentity string          `json:"runtimeActionIdentity,omitempty"`
 	RestartAt             string          `json:"restartAt,omitempty"`
+	InitialReplicas       *int64          `json:"initialReplicas,omitempty"`
 	TargetReplicas        *int64          `json:"targetReplicas,omitempty"`
 }
 

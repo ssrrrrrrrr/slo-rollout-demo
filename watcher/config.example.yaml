@@ -5,6 +5,7 @@ reportDir: /root/slo-rollout-demo/docs/release-reports
 stateFile: /root/slo-rollout-demo/docs/release-reports/go-rollout-watcher-state.json
 evidenceStoreDB: /tmp/s-sentinel-evidence-store/portal-evidence-store.db
 incidentStoreDB: /tmp/s-sentinel-incident-store/incidents.db
+operationStoreDB: /tmp/s-sentinel-operation-store/operations.db
 evidenceStoreScriptFile: /root/slo-rollout-demo/scripts/evidence-store.py
 evidenceStorePython: python3
 evidenceStoreRefreshStateFile: /tmp/s-sentinel-evidence-store/portal-evidence-store-refresh.json

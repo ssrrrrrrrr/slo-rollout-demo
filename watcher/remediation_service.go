@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -21,12 +20,10 @@ type RemediationService struct {
 	repository       EvidenceRepository
 	executionAdapter RemediationExecutionAdapter
 	operation        *OperationService
-	mu               sync.Mutex
-	executions       map[string]RemediationExecution
 }
 
 func NewRemediationService(incidentService *IncidentService, sloService *SLOService, runtimeService *RuntimeService, repository EvidenceRepository, executionAdapter RemediationExecutionAdapter) *RemediationService {
-	return &RemediationService{incidentService: incidentService, sloService: sloService, runtimeService: runtimeService, repository: repository, executionAdapter: executionAdapter, operation: NewOperationService(NewOperationExecutorRegistry(ReleaseRuntimeActionExecutorAdapter{adapter: executionAdapter})), executions: map[string]RemediationExecution{}}
+	return &RemediationService{incidentService: incidentService, sloService: sloService, runtimeService: runtimeService, repository: repository, executionAdapter: executionAdapter, operation: NewOperationService(NewOperationExecutorRegistry(ReleaseRuntimeActionExecutorAdapter{adapter: executionAdapter}))}
 }
 
 func (api *portalAPI) remediationService() *RemediationService {
@@ -105,11 +102,7 @@ func (svc *RemediationService) Plan(ctx context.Context, r *http.Request, incide
 			plan.Eligibility = remediationBlockedEligibility(plan.Eligibility, err.Error())
 		}
 	}
-	plan.Execution = svc.executionFor(plan.OperationID)
-	if plan.Execution != nil {
-		verification, _ := svc.verify(ctx, r, plan, *plan.Execution)
-		plan.Verification = &verification
-	}
+	svc.projectDurableOperation(ctx, &plan)
 	return plan, nil
 }
 
@@ -244,24 +237,16 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 	}
 	op := remediationControlledOperation(plan)
 	plan.OperationID = op.ID
-	key := op.IdempotencyKey
-	svc.mu.Lock()
-	if existing, ok := svc.executions[key]; ok {
-		existing.Idempotent = true
-		plan.Execution = &existing
-		svc.mu.Unlock()
-		return plan, nil
+	previous, _ := svc.operation.Get(ctx, op.ID)
+	if previous != nil && (previous.ExecutionIntent.Action != op.Action || previous.ExecutionIntent.ReleaseID != plan.Target.ReleaseID || previous.ExecutionIntent.Target.ReleaseID != plan.Target.ReleaseID) {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: "durable release operation intent no longer matches the current remediation target"}
 	}
-	svc.executions[key] = RemediationExecution{RequestKey: key, Status: "EXECUTING", Action: requestedAction, Target: plan.Target}
-	svc.mu.Unlock()
 	result, err := svc.operation.Execute(ctx, op)
-	if unavailable := (*RuntimeActionPipelineUnavailableError)(nil); errors.As(err, &unavailable) {
-		svc.mu.Lock()
-		delete(svc.executions, key)
-		svc.mu.Unlock()
-		return plan, &RemediationRequestError{StatusCode: 409, Message: unavailable.Error()}
+	var ledgerErr *OperationLedgerError
+	if errors.As(err, &ledgerErr) {
+		return plan, &RemediationRequestError{StatusCode: 409, Message: ledgerErr.Error()}
 	}
-	execution := RemediationExecution{RequestKey: key, Action: requestedAction, ExecutedAt: time.Now().Format(time.RFC3339), Target: plan.Target}
+	execution := RemediationExecution{RequestKey: op.IdempotencyKey, Action: requestedAction, ExecutedAt: time.Now().Format(time.RFC3339), Target: plan.Target}
 	if err != nil {
 		execution.Status, execution.Reason = "FAILED", err.Error()
 	} else {
@@ -272,16 +257,21 @@ func (svc *RemediationService) Execute(ctx context.Context, r *http.Request, inc
 		if result.ExternalTarget.Namespace != "" || result.ExternalTarget.WorkloadName != "" {
 			execution.Target = RemediationTarget{ReleaseID: result.ExternalTarget.ReleaseID, Namespace: result.ExternalTarget.Namespace, Workload: result.ExternalTarget.WorkloadName}
 		}
-		if execution.Status != "SUCCEEDED" || !execution.ActionVerified {
+		if (execution.Status == "SUCCEEDED" && !execution.ActionVerified) || (execution.Status != "SUCCEEDED" && execution.Status != "UNKNOWN") {
 			execution.Status = "FAILED"
 		}
 	}
-	svc.mu.Lock()
-	svc.executions[key] = execution
-	svc.mu.Unlock()
+	if previous != nil && previous.State != OperationStatePlanned && previous.State != OperationStateWaitingApproval {
+		execution.Idempotent = true
+	}
 	plan.Execution = &execution
+	if execution.Status == "UNKNOWN" {
+		plan.Verification = &RemediationVerification{Status: RemediationVerificationUnknown, Reason: firstNonEmpty(execution.Reason, "durable operation execution state is unknown")}
+		return plan, nil
+	}
 	verification, _ := svc.verify(ctx, r, plan, execution)
 	plan.Verification = &verification
+	_, _ = svc.operation.RecordVerification(ctx, op.ID, operationVerificationFromRemediation(verification))
 	svc.incidentService.RecordRemediationVerification(ctx, incidentID, verification)
 	return plan, nil
 }
@@ -294,7 +284,11 @@ func (svc *RemediationService) Verification(ctx context.Context, r *http.Request
 	if plan.Execution == nil {
 		return RemediationVerification{Status: RemediationVerificationPending, Reason: "no remediation execution has been recorded"}, nil
 	}
-	return svc.verify(ctx, r, plan, *plan.Execution)
+	verification, err := svc.verify(ctx, r, plan, *plan.Execution)
+	if err == nil && plan.OperationID != "" {
+		_, _ = svc.operation.RecordVerification(ctx, plan.OperationID, operationVerificationFromRemediation(verification))
+	}
+	return verification, err
 }
 
 func (svc *RemediationService) verify(ctx context.Context, _ *http.Request, plan RemediationPlan, execution RemediationExecution) (RemediationVerification, error) {
@@ -320,14 +314,28 @@ func (svc *RemediationService) verify(ctx context.Context, _ *http.Request, plan
 	return verification, nil
 }
 
-func (svc *RemediationService) executionFor(key string) *RemediationExecution {
-	svc.mu.Lock()
-	defer svc.mu.Unlock()
-	result, ok := svc.executions[key]
-	if !ok {
-		return nil
+func (svc *RemediationService) projectDurableOperation(ctx context.Context, plan *RemediationPlan) {
+	if svc.operation == nil || plan.OperationID == "" {
+		return
 	}
-	return &result
+	op, err := svc.operation.Get(ctx, plan.OperationID)
+	if err != nil {
+		return
+	}
+	if op.Execution.Status != "" {
+		plan.Execution = &RemediationExecution{RequestKey: op.ID, Action: plan.Recommendation.Action, ExecutedAt: op.Execution.FinishedAt, StartedAt: op.Execution.StartedAt, FinishedAt: op.Execution.FinishedAt, Status: op.Execution.Status, Reason: op.Execution.Reason, Target: plan.Target, PostState: op.Execution.PostState, ResultID: op.Execution.ExternalResultID, ActionVerified: op.Execution.ActionVerified, Idempotent: true}
+	}
+	if op.Verification.Status != "" {
+		plan.Verification = remediationVerificationFromOperation(op.Verification)
+	}
+}
+
+func operationVerificationFromRemediation(v RemediationVerification) OperationVerificationState {
+	return OperationVerificationState{Status: string(v.Status), Reason: v.Reason, RuntimeStatus: v.RuntimeStatus, SLOStatus: v.SLOStatus, ActionVerified: v.ActionVerified}
+}
+
+func remediationVerificationFromOperation(v OperationVerificationState) *RemediationVerification {
+	return &RemediationVerification{Status: RemediationVerificationStatus(v.Status), Reason: v.Reason, RuntimeStatus: v.RuntimeStatus, SLOStatus: v.SLOStatus, ActionVerified: v.ActionVerified, RuntimeRecovered: v.Status == "RECOVERED", SLORecovered: v.Status == "RECOVERED" || v.SLOStatus != SLOStatusBreached}
 }
 
 func remediationRequestKey(incidentID, releaseID, action string) string {
