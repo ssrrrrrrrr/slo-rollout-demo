@@ -122,42 +122,6 @@ def infer_schema_name(document: Any, file_name: str) -> str:
             return "execution-preview.schema.json"
         if schema_version == "execution.result/v1alpha1":
             return "execution-result.schema.json"
-        if schema_version == "gitops.patch.proposal/v1alpha1":
-            return "gitops-patch-proposal.schema.json"
-        if schema_version == "gitops.pr.bundle/v1alpha1":
-            return "gitops-pr-bundle.schema.json"
-        if schema_version == "gitops.handoff.bundle/v1alpha1":
-            return "gitops-handoff-bundle.schema.json"
-        if schema_version == "gitops.adapter.request/v1alpha1":
-            return "gitops-adapter-request.schema.json"
-        if schema_version == "gitops.adapter.result/v1alpha1":
-            return "gitops-adapter-result.schema.json"
-        if schema_version == "gitops.adapter.delivery/v1alpha1":
-            return "gitops-adapter-delivery.schema.json"
-        if schema_version == "gitops.adapter.run/v1alpha1":
-            return "gitops-adapter-run.schema.json"
-        if schema_version == "gitops.adapter.pickup.ack/v1alpha1":
-            return "gitops-adapter-pickup-ack.schema.json"
-        if schema_version == "gitops.adapter.handoff.state/v1alpha1":
-            return "gitops-adapter-handoff-state.schema.json"
-        if schema_version == "gitops.adapter.pickup.event/v1alpha1":
-            return "gitops-adapter-pickup-event.schema.json"
-        if schema_version == "gitops.adapter.pickup.transition/v1alpha1":
-            return "gitops-adapter-pickup-transition.schema.json"
-        if schema_version == "gitops.adapter.handoff.prep/v1alpha1":
-            return "gitops-adapter-handoff-prep.schema.json"
-        if schema_version == "gitops.adapter.handoff.progress/v1alpha1":
-            return "gitops-adapter-handoff-progress.schema.json"
-        if schema_version == "gitops.adapter.payload/v1alpha1":
-            return "gitops-adapter-payload.schema.json"
-        if schema_version == "gitops.adapter.dispatch/v1alpha1":
-            return "gitops-adapter-dispatch.schema.json"
-        if schema_version == "gitops.adapter.provider.request/v1alpha1":
-            return "gitops-adapter-provider-request.schema.json"
-        if schema_version == "gitops.adapter.provider.result/v1alpha1":
-            return "gitops-adapter-provider-result.schema.json"
-        if schema_version == "gitops.adapter.pickup/v1alpha1":
-            return "gitops-adapter-pickup.schema.json"
         if schema_version == "supply.chain.decision/v1alpha1":
             return "supply-chain-decision.schema.json"
 
@@ -180,42 +144,6 @@ def infer_schema_name(document: Any, file_name: str) -> str:
         return "execution-preview.schema.json"
     if "execution-result" in lower_name:
         return "execution-result.schema.json"
-    if "gitops-patch-proposal" in lower_name:
-        return "gitops-patch-proposal.schema.json"
-    if "gitops-pr-bundle" in lower_name:
-        return "gitops-pr-bundle.schema.json"
-    if "gitops-handoff-bundle" in lower_name:
-        return "gitops-handoff-bundle.schema.json"
-    if "gitops-adapter-request" in lower_name:
-        return "gitops-adapter-request.schema.json"
-    if "gitops-adapter-result" in lower_name:
-        return "gitops-adapter-result.schema.json"
-    if "gitops-adapter-delivery" in lower_name:
-        return "gitops-adapter-delivery.schema.json"
-    if "gitops-adapter-run" in lower_name:
-        return "gitops-adapter-run.schema.json"
-    if "gitops-adapter-pickup-ack" in lower_name:
-        return "gitops-adapter-pickup-ack.schema.json"
-    if "gitops-adapter-handoff-state" in lower_name:
-        return "gitops-adapter-handoff-state.schema.json"
-    if "gitops-adapter-pickup-event" in lower_name:
-        return "gitops-adapter-pickup-event.schema.json"
-    if "gitops-adapter-pickup-transition" in lower_name:
-        return "gitops-adapter-pickup-transition.schema.json"
-    if "gitops-adapter-handoff-prep" in lower_name:
-        return "gitops-adapter-handoff-prep.schema.json"
-    if "gitops-adapter-handoff-progress" in lower_name:
-        return "gitops-adapter-handoff-progress.schema.json"
-    if "gitops-adapter-payload" in lower_name:
-        return "gitops-adapter-payload.schema.json"
-    if "gitops-adapter-dispatch" in lower_name:
-        return "gitops-adapter-dispatch.schema.json"
-    if "gitops-adapter-provider-request" in lower_name:
-        return "gitops-adapter-provider-request.schema.json"
-    if "gitops-adapter-provider-result" in lower_name:
-        return "gitops-adapter-provider-result.schema.json"
-    if "gitops-adapter-pickup" in lower_name:
-        return "gitops-adapter-pickup.schema.json"
     if "plan-run" in lower_name:
         return "plan-run.schema.json"
     if "action-plan" in lower_name:
@@ -230,7 +158,7 @@ def infer_schema_name(document: Any, file_name: str) -> str:
         return "agent-run.schema.json"
 
     raise ValidationError(
-        f"cannot infer schema for {file_name}; use a file name containing release-context, policy-decision, release-evidence, ai-decision, action-plan, plan-run, execution-request, execution-eligibility, execution-preview, execution-result, gitops-patch-proposal, gitops-pr-bundle, gitops-handoff-bundle, gitops-adapter-request, gitops-adapter-result, gitops-adapter-delivery, gitops-adapter-run, gitops-adapter-pickup, gitops-adapter-pickup-ack, gitops-adapter-handoff-state, gitops-adapter-pickup-event, gitops-adapter-pickup-transition, gitops-adapter-handoff-prep, gitops-adapter-handoff-progress, gitops-adapter-payload, gitops-adapter-dispatch, gitops-adapter-provider-request, gitops-adapter-provider-result, supply-chain-decision, release-intelligence, release-timeline, evidence-record, agent-run"
+        f"cannot infer schema for {file_name}; use a file name containing release-context, policy-decision, release-evidence, ai-decision, action-plan, plan-run, execution-request, execution-eligibility, execution-preview, execution-result, supply-chain-decision, release-intelligence, release-timeline, evidence-record, agent-run"
     )
 
 

@@ -44,24 +44,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PREVIEW_OUTPUT="$("$SCRIPT_DIR/build-execution-preview.sh" "$INPUT_FILE" | tail -n 1)"
 RESULT_OUTPUT="$("$SCRIPT_DIR/build-execution-result.sh" "$INPUT_FILE" | tail -n 1)"
-PROPOSAL_OUTPUT="$("$SCRIPT_DIR/build-gitops-patch-proposal.sh" "$INPUT_FILE" | tail -n 1)"
-BUNDLE_OUTPUT="$("$SCRIPT_DIR/build-gitops-pr-bundle.sh" "$INPUT_FILE" | tail -n 1)"
-HANDOFF_OUTPUT="$("$SCRIPT_DIR/build-gitops-handoff-bundle.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_REQUEST_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-request.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_RESULT_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-result.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_DELIVERY_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-delivery.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_RUN_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-run.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PICKUP_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-pickup.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PICKUP_ACK_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-pickup-ack.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_HANDOFF_STATE_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-handoff-state.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PICKUP_EVENT_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-pickup-event.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PICKUP_TRANSITION_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-pickup-transition.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_HANDOFF_PREP_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-handoff-prep.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_HANDOFF_PROGRESS_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-handoff-progress.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PAYLOAD_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-payload.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_DISPATCH_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-dispatch.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PROVIDER_REQUEST_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-provider-request.sh" "$INPUT_FILE" | tail -n 1)"
-ADAPTER_PROVIDER_RESULT_OUTPUT="$("$SCRIPT_DIR/build-gitops-adapter-provider-result.sh" "$INPUT_FILE" | tail -n 1)"
 RECORD_OUTPUT="$("$SCRIPT_DIR/build-evidence-record.sh" "$INPUT_FILE" | tail -n 1)"
 
 if [ -z "${PYTHON_BIN:-}" ]; then
@@ -101,34 +83,6 @@ print(json.dumps({
         "releaseEvidence": str(input_path),
         "executionPreview": artifacts.get("executionPreview"),
         "executionResult": artifacts.get("executionResult"),
-        "gitopsPatchProposal": artifacts.get("gitopsPatchProposal"),
-        "gitopsPRBundle": artifacts.get("gitopsPRBundle"),
-        "gitopsHandoffBundle": artifacts.get("gitopsHandoffBundle"),
-        "gitopsAdapterRequest": artifacts.get("gitopsAdapterRequest"),
-        "gitopsAdapterResult": artifacts.get("gitopsAdapterResult"),
-        "gitopsAdapterDelivery": artifacts.get("gitopsAdapterDelivery"),
-        "gitopsAdapterRun": artifacts.get("gitopsAdapterRun"),
-        "gitopsAdapterPickup": artifacts.get("gitopsAdapterPickup"),
-        "gitopsAdapterPickupAck": artifacts.get("gitopsAdapterPickupAck"),
-        "gitopsAdapterHandoffState": artifacts.get("gitopsAdapterHandoffState"),
-        "gitopsAdapterPickupEvent": artifacts.get("gitopsAdapterPickupEvent"),
-        "gitopsAdapterPickupTransition": artifacts.get("gitopsAdapterPickupTransition"),
-        "gitopsAdapterHandoffPrep": artifacts.get("gitopsAdapterHandoffPrep"),
-        "gitopsAdapterHandoffProgress": artifacts.get("gitopsAdapterHandoffProgress"),
-        "gitopsAdapterPayload": artifacts.get("gitopsAdapterPayload"),
-        "gitopsAdapterDispatch": artifacts.get("gitopsAdapterDispatch"),
-        "gitopsAdapterProviderRequest": artifacts.get("gitopsAdapterProviderRequest"),
-        "gitopsAdapterProviderResult": artifacts.get("gitopsAdapterProviderResult"),
-        "gitopsRealPRPlan": artifacts.get("gitopsRealPRPlan"),
-        "gitopsRealPRWorkspace": artifacts.get("gitopsRealPRWorkspace"),
-        "gitopsRealPRMaterialization": artifacts.get("gitopsRealPRMaterialization"),
-        "gitopsRealPRFileMaterialization": artifacts.get("gitopsRealPRFileMaterialization"),
-        "gitopsRealPRLocalCommit": artifacts.get("gitopsRealPRLocalCommit"),
-        "gitopsRealPRPushPreflight": artifacts.get("gitopsRealPRPushPreflight"),
-        "gitopsRealPRBranchPush": artifacts.get("gitopsRealPRBranchPush"),
-        "gitopsRealPRCreatePreflight": artifacts.get("gitopsRealPRCreatePreflight"),
-        "gitopsRealPRCreate": artifacts.get("gitopsRealPRCreate"),
-        "gitopsRealPRCleanup": artifacts.get("gitopsRealPRCleanup"),
     },
     "guardrails": {
         "readOnly": False,

@@ -1,5 +1,5 @@
 ﻿import { useQueries } from "@tanstack/react-query"
-import { Activity, FileText, GitBranch, ShieldCheck } from "lucide-react"
+import { Activity, FileText, ShieldCheck } from "lucide-react"
 import {
   fetchReleaseResource,
   formatResourceBody,
@@ -26,20 +26,6 @@ const groupedResources: Record<string, { title: string; description: string; ite
       { label: "AI Decision", kind: "ai-decision", description: "Advisor decision that may recommend an action." },
     ],
   },
-  GitOps: {
-    title: "GitOps Control Chain",
-    description: "GitOps proposal, bundle, handoff, adapter, and provider artifacts grouped as one workflow.",
-    items: [
-      { label: "Proposal", kind: "gitops-proposal", description: "Review-only GitOps patch proposal." },
-      { label: "Bundle", kind: "gitops-bundle", description: "PR-ready branch, commit message, and body bundle." },
-      { label: "Handoff", kind: "gitops-handoff", description: "Materialized local handoff package." },
-      { label: "Provider Request", kind: "gitops-provider-request", description: "Provider-ready PR request contract." },
-      { label: "Provider Result", kind: "gitops-provider-result", description: "Provider-ready local PR result receipt." },
-      { label: "Workspace", kind: "gitops-workspace", description: "Local pickup workspace artifact." },
-      { label: "Dispatch", kind: "gitops-dispatch", description: "External adapter dispatch contract." },
-      { label: "Payload", kind: "gitops-payload", description: "Adapter payload package." },
-    ],
-  },
   Advisor: {
     title: "Advisor",
     description: "Read-only AI advisor output and release intelligence artifacts.",
@@ -62,7 +48,6 @@ const groupedResources: Record<string, { title: string; description: string; ite
 }
 
 function iconFor(tab: string) {
-  if (tab === "GitOps") return <GitBranch className="h-4 w-4 text-[#5d8fd8]" />
   if (tab === "Runtime Actions") return <ShieldCheck className="h-4 w-4 text-[#5d8fd8]" />
   return <Activity className="h-4 w-4 text-[#5d8fd8]" />
 }

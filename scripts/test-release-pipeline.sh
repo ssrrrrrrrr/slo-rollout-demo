@@ -352,16 +352,6 @@ main() {
   bash -n scripts/build-supply-chain-decision.sh
   bash -n scripts/build-execution-preview.sh
   bash -n scripts/build-execution-result.sh
-  bash -n scripts/build-gitops-patch-proposal.sh
-  bash -n scripts/build-gitops-pr-bundle.sh
-  bash -n scripts/build-gitops-handoff-bundle.sh
-  bash -n scripts/build-gitops-adapter-request.sh
-  bash -n scripts/build-gitops-adapter-result.sh
-  bash -n scripts/build-gitops-adapter-delivery.sh
-  bash -n scripts/build-gitops-adapter-run.sh
-  bash -n scripts/build-gitops-adapter-pickup.sh
-  bash -n scripts/build-gitops-adapter-pickup-ack.sh
-  bash -n scripts/build-gitops-adapter-handoff-state.sh
   bash -n scripts/run-noop-executor.sh
   bash -n scripts/test-release-intelligence.sh
   bash -n scripts/test-readonly-release-agent.sh
@@ -369,16 +359,6 @@ main() {
   bash -n scripts/test-execution-request.sh
   bash -n scripts/test-execution-preview.sh
   bash -n scripts/test-execution-result.sh
-  bash -n scripts/test-gitops-patch-proposal.sh
-  bash -n scripts/test-gitops-pr-bundle.sh
-  bash -n scripts/test-gitops-handoff-bundle.sh
-  bash -n scripts/test-gitops-adapter-request.sh
-  bash -n scripts/test-gitops-adapter-result.sh
-  bash -n scripts/test-gitops-adapter-delivery.sh
-  bash -n scripts/test-gitops-adapter-run.sh
-  bash -n scripts/test-gitops-adapter-pickup.sh
-  bash -n scripts/test-gitops-adapter-pickup-ack.sh
-  bash -n scripts/test-gitops-adapter-handoff-state.sh
   bash -n scripts/test-noop-executor.sh
   bash -n scripts/test-supply-chain-decision.sh
   bash -n scripts/test-agent-tool-router-intelligence.sh
@@ -419,16 +399,6 @@ main() {
   ./scripts/test-execution-request.sh "$TEST_TMP/execution-request"
   ./scripts/test-execution-preview.sh
   ./scripts/test-execution-result.sh
-  ./scripts/test-gitops-patch-proposal.sh
-  ./scripts/test-gitops-pr-bundle.sh
-  ./scripts/test-gitops-handoff-bundle.sh
-  ./scripts/test-gitops-adapter-request.sh
-  ./scripts/test-gitops-adapter-result.sh
-  ./scripts/test-gitops-adapter-delivery.sh
-  ./scripts/test-gitops-adapter-run.sh
-  ./scripts/test-gitops-adapter-pickup.sh
-  ./scripts/test-gitops-adapter-pickup-ack.sh
-  ./scripts/test-gitops-adapter-handoff-state.sh
   ./scripts/test-noop-executor.sh
   ./scripts/test-supply-chain-decision.sh "$TEST_TMP/supply-chain-decision"
   ./scripts/test-release-summary-intelligence.sh "$TEST_TMP/release-summary-intelligence"

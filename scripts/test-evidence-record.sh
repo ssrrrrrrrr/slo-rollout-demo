@@ -18,7 +18,6 @@ fail() {
 
 log "syntax checks"
 bash -n scripts/build-evidence-record.sh
-bash -n scripts/test-evidence-record-gitops-real-pr-links.sh
 bash -n scripts/ai-release-advisor.sh
 
 log "schema parse checks"
@@ -206,9 +205,6 @@ assert latest["evidenceId"] == record["evidenceId"], latest
 
 print("PASS: evidence record content")
 PY
-
-log "validate gitops real PR evidence record links"
-bash scripts/test-evidence-record-gitops-real-pr-links.sh
 
 log "validate evidence record contract"
 

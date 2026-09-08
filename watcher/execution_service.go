@@ -92,40 +92,17 @@ func (svc *ExecutionService) capabilities() map[string]interface{} {
 	descriptor := svc.runtime.Descriptor()
 
 	return map[string]interface{}{
-		"runNoopExecution":                descriptor.SupportsNoopExecution,
-		"autoBuildsPreview":               descriptor.AutoBuildsPreview,
-		"mutatesLocalEvidence":            descriptor.MutatesLocalEvidence,
-		"doesNotModifyCluster":            descriptor.DoesNotModifyCluster,
-		"doesNotModifyGitOps":             descriptor.DoesNotModifyGitOps,
-		"doesNotTriggerRollout":           descriptor.DoesNotTriggerRollout,
-		"executionResultReader":           true,
-		"evidenceRecordEmitter":           true,
-		"gitopsAdapterReceipt":            true,
-		"gitopsDeliveryWorkspace":         true,
-		"gitopsAdapterRun":                true,
-		"gitopsAdapterPickup":             true,
-		"gitopsAdapterPickupAck":          true,
-		"gitopsAdapterHandoffState":       true,
-		"gitopsAdapterPickupEvent":        true,
-		"gitopsAdapterPickupTransition":   true,
-		"gitopsAdapterHandoffPrep":        true,
-		"gitopsAdapterHandoffProgress":    true,
-		"gitopsAdapterPayload":            true,
-		"gitopsAdapterDispatch":           true,
-		"gitopsAdapterProviderRequest":    true,
-		"gitopsAdapterProviderResult":     true,
-		"gitopsRealPRPlan":                true,
-		"gitopsRealPRWorkspace":           true,
-		"gitopsRealPRMaterialization":     true,
-		"gitopsRealPRFileMaterialization": true,
-		"gitopsRealPRLocalCommit":         true,
-		"gitopsRealPRPushPreflight":       true,
-		"gitopsRealPRBranchPush":          true,
-		"gitopsRealPRCreatePreflight":     true,
-		"gitopsRealPRCreate":              true,
-		"gitopsRealPRCleanup":             true,
-		"futureExecutorAdapter":           false,
-		"approvalAwareExecutor":           true,
+		"runNoopExecution":        descriptor.SupportsNoopExecution,
+		"autoBuildsPreview":       descriptor.AutoBuildsPreview,
+		"mutatesLocalEvidence":    descriptor.MutatesLocalEvidence,
+		"doesNotModifyCluster":    descriptor.DoesNotModifyCluster,
+		"doesNotModifyGitOps":     descriptor.DoesNotModifyGitOps,
+		"doesNotTriggerRollout":   descriptor.DoesNotTriggerRollout,
+		"executionResultReader":   true,
+		"evidenceRecordEmitter":   true,
+		"gitopsDeliveryWorkspace": true,
+		"futureExecutorAdapter":   false,
+		"approvalAwareExecutor":   true,
 	}
 }
 
@@ -164,24 +141,6 @@ func (svc *ExecutionService) Status(ctx context.Context) map[string]interface{} 
 	latestReleaseEvidenceFile, _ := svc.resolveReleaseEvidenceFile("")
 	latestExecutionPreviewFile, _ := svc.findLatestReportFile("execution-preview-*.json", "execution-preview-latest.json")
 	latestExecutionResultFile, _ := svc.findLatestReportFile("execution-result-*.json", "execution-result-latest.json")
-	latestGitOpsProposalFile, _ := svc.findLatestReportFile("gitops-patch-proposal-*.json", "gitops-patch-proposal-latest.json")
-	latestGitOpsBundleFile, _ := svc.findLatestReportFile("gitops-pr-bundle-*.json", "gitops-pr-bundle-latest.json")
-	latestGitOpsHandoffFile, _ := svc.findLatestReportFile("gitops-handoff-bundle-*.json", "gitops-handoff-bundle-latest.json")
-	latestGitOpsAdapterRequestFile, _ := svc.findLatestReportFile("gitops-adapter-request-*.json", "gitops-adapter-request-latest.json")
-	latestGitOpsAdapterResultFile, _ := svc.findLatestReportFile("gitops-adapter-result-*.json", "gitops-adapter-result-latest.json")
-	latestGitOpsAdapterDeliveryFile, _ := svc.findLatestReportFile("gitops-adapter-delivery-*.json", "gitops-adapter-delivery-latest.json")
-	latestGitOpsAdapterRunFile, _ := svc.findLatestReportFile("gitops-adapter-run-*.json", "gitops-adapter-run-latest.json")
-	latestGitOpsAdapterPickupFile, _ := svc.findLatestReportFile("gitops-adapter-pickup-*.json", "gitops-adapter-pickup-latest.json")
-	latestGitOpsAdapterPickupAckFile, _ := svc.findLatestReportFile("gitops-adapter-pickup-ack-*.json", "gitops-adapter-pickup-ack-latest.json")
-	latestGitOpsAdapterHandoffStateFile, _ := svc.findLatestReportFile("gitops-adapter-handoff-state-*.json", "gitops-adapter-handoff-state-latest.json")
-	latestGitOpsAdapterPickupEventFile, _ := svc.findLatestReportFile("gitops-adapter-pickup-event-*.json", "gitops-adapter-pickup-event-latest.json")
-	latestGitOpsAdapterPickupTransitionFile, _ := svc.findLatestReportFile("gitops-adapter-pickup-transition-*.json", "gitops-adapter-pickup-transition-latest.json")
-	latestGitOpsAdapterHandoffPrepFile, _ := svc.findLatestReportFile("gitops-adapter-handoff-prep-*.json", "gitops-adapter-handoff-prep-latest.json")
-	latestGitOpsAdapterHandoffProgressFile, _ := svc.findLatestReportFile("gitops-adapter-handoff-progress-*.json", "gitops-adapter-handoff-progress-latest.json")
-	latestGitOpsAdapterPayloadFile, _ := svc.findLatestReportFile("gitops-adapter-payload-*.json", "gitops-adapter-payload-latest.json")
-	latestGitOpsAdapterDispatchFile, _ := svc.findLatestReportFile("gitops-adapter-dispatch-*.json", "gitops-adapter-dispatch-latest.json")
-	latestGitOpsAdapterProviderRequestFile, _ := svc.findLatestReportFile("gitops-adapter-provider-request-*.json", "gitops-adapter-provider-request-latest.json")
-	latestGitOpsAdapterProviderResultFile, _ := svc.findLatestReportFile("gitops-adapter-provider-result-*.json", "gitops-adapter-provider-result-latest.json")
 	latestEvidenceRecordFile, _ := svc.findLatestReportFile("evidence-record-*.json", "evidence-record-latest.json")
 
 	ready := false
@@ -192,43 +151,25 @@ func (svc *ExecutionService) Status(ctx context.Context) map[string]interface{} 
 	}
 
 	body := map[string]interface{}{
-		"schemaVersion":                       "execution.noop.status/v1alpha1",
-		"generatedAt":                         time.Now().Format(time.RFC3339),
-		"mode":                                svc.runtime.Descriptor().Mode,
-		"service":                             svc.serviceContract(),
-		"runtime":                             svc.runtime.Descriptor(),
-		"paths":                               svc.runtimePaths(),
-		"capabilities":                        svc.capabilities(),
-		"controlPlane":                        svc.ControlPlaneMetadataForOperation("status", false),
-		"ready":                               ready,
-		"readOnly":                            true,
-		"willExecute":                         false,
-		"doesNotModifyCluster":                true,
-		"doesNotModifyGitOps":                 true,
-		"doesNotTriggerRollout":               true,
-		"mutatesLocalEvidenceFiles":           false,
-		"latestReleaseEvidenceFile":           latestReleaseEvidenceFile,
-		"latestExecutionPreviewFile":          latestExecutionPreviewFile,
-		"latestExecutionResultFile":           latestExecutionResultFile,
-		"latestGitOpsProposalFile":            latestGitOpsProposalFile,
-		"latestGitOpsBundleFile":              latestGitOpsBundleFile,
-		"latestGitOpsHandoffFile":             latestGitOpsHandoffFile,
-		"latestGitOpsAdapterRequest":          latestGitOpsAdapterRequestFile,
-		"latestGitOpsAdapterResult":           latestGitOpsAdapterResultFile,
-		"latestGitOpsAdapterDelivery":         latestGitOpsAdapterDeliveryFile,
-		"latestGitOpsAdapterRun":              latestGitOpsAdapterRunFile,
-		"latestGitOpsAdapterPickup":           latestGitOpsAdapterPickupFile,
-		"latestGitOpsAdapterPickupAck":        latestGitOpsAdapterPickupAckFile,
-		"latestGitOpsAdapterHandoffState":     latestGitOpsAdapterHandoffStateFile,
-		"latestGitOpsAdapterPickupEvent":      latestGitOpsAdapterPickupEventFile,
-		"latestGitOpsAdapterPickupTransition": latestGitOpsAdapterPickupTransitionFile,
-		"latestGitOpsAdapterHandoffPrep":      latestGitOpsAdapterHandoffPrepFile,
-		"latestGitOpsAdapterHandoffProgress":  latestGitOpsAdapterHandoffProgressFile,
-		"latestGitOpsAdapterPayload":          latestGitOpsAdapterPayloadFile,
-		"latestGitOpsAdapterDispatch":         latestGitOpsAdapterDispatchFile,
-		"latestGitOpsAdapterProviderRequest":  latestGitOpsAdapterProviderRequestFile,
-		"latestGitOpsAdapterProviderResult":   latestGitOpsAdapterProviderResultFile,
-		"latestEvidenceRecordFile":            latestEvidenceRecordFile,
+		"schemaVersion":              "execution.noop.status/v1alpha1",
+		"generatedAt":                time.Now().Format(time.RFC3339),
+		"mode":                       svc.runtime.Descriptor().Mode,
+		"service":                    svc.serviceContract(),
+		"runtime":                    svc.runtime.Descriptor(),
+		"paths":                      svc.runtimePaths(),
+		"capabilities":               svc.capabilities(),
+		"controlPlane":               svc.ControlPlaneMetadataForOperation("status", false),
+		"ready":                      ready,
+		"readOnly":                   true,
+		"willExecute":                false,
+		"doesNotModifyCluster":       true,
+		"doesNotModifyGitOps":        true,
+		"doesNotTriggerRollout":      true,
+		"mutatesLocalEvidenceFiles":  false,
+		"latestReleaseEvidenceFile":  latestReleaseEvidenceFile,
+		"latestExecutionPreviewFile": latestExecutionPreviewFile,
+		"latestExecutionResultFile":  latestExecutionResultFile,
+		"latestEvidenceRecordFile":   latestEvidenceRecordFile,
 	}
 
 	if latestResult := svc.readJSONFile(latestExecutionResultFile); latestResult != nil {
@@ -268,102 +209,6 @@ func (svc *ExecutionService) Latest(ctx context.Context) (map[string]interface{}
 
 	if latestEvidenceRecordFile, recordErr := svc.findLatestReportFile("evidence-record-*.json", "evidence-record-latest.json"); recordErr == nil {
 		body["latestEvidenceRecordFile"] = latestEvidenceRecordFile
-	}
-	if latestGitOpsProposalFile, proposalErr := svc.findLatestReportFile("gitops-patch-proposal-*.json", "gitops-patch-proposal-latest.json"); proposalErr == nil {
-		body["latestGitOpsProposalFile"] = latestGitOpsProposalFile
-	}
-	if latestGitOpsBundleFile, bundleErr := svc.findLatestReportFile("gitops-pr-bundle-*.json", "gitops-pr-bundle-latest.json"); bundleErr == nil {
-		body["latestGitOpsBundleFile"] = latestGitOpsBundleFile
-	}
-	if latestGitOpsHandoffFile, handoffErr := svc.findLatestReportFile("gitops-handoff-bundle-*.json", "gitops-handoff-bundle-latest.json"); handoffErr == nil {
-		body["latestGitOpsHandoffFile"] = latestGitOpsHandoffFile
-	}
-	if latestGitOpsAdapterRequestFile, adapterErr := svc.findLatestReportFile("gitops-adapter-request-*.json", "gitops-adapter-request-latest.json"); adapterErr == nil {
-		body["latestGitOpsAdapterRequestFile"] = latestGitOpsAdapterRequestFile
-	}
-	if latestGitOpsAdapterResultFile, adapterResultErr := svc.findLatestReportFile("gitops-adapter-result-*.json", "gitops-adapter-result-latest.json"); adapterResultErr == nil {
-		body["latestGitOpsAdapterResultFile"] = latestGitOpsAdapterResultFile
-		if latestGitOpsAdapterResult := svc.readJSONFile(latestGitOpsAdapterResultFile); latestGitOpsAdapterResult != nil {
-			body["gitOpsAdapterResult"] = latestGitOpsAdapterResult
-		}
-	}
-	if latestGitOpsAdapterDeliveryFile, adapterDeliveryErr := svc.findLatestReportFile("gitops-adapter-delivery-*.json", "gitops-adapter-delivery-latest.json"); adapterDeliveryErr == nil {
-		body["latestGitOpsAdapterDeliveryFile"] = latestGitOpsAdapterDeliveryFile
-		if latestGitOpsAdapterDelivery := svc.readJSONFile(latestGitOpsAdapterDeliveryFile); latestGitOpsAdapterDelivery != nil {
-			body["gitOpsAdapterDelivery"] = latestGitOpsAdapterDelivery
-		}
-	}
-	if latestGitOpsAdapterRunFile, adapterRunErr := svc.findLatestReportFile("gitops-adapter-run-*.json", "gitops-adapter-run-latest.json"); adapterRunErr == nil {
-		body["latestGitOpsAdapterRunFile"] = latestGitOpsAdapterRunFile
-		if latestGitOpsAdapterRun := svc.readJSONFile(latestGitOpsAdapterRunFile); latestGitOpsAdapterRun != nil {
-			body["gitOpsAdapterRun"] = latestGitOpsAdapterRun
-		}
-	}
-	if latestGitOpsAdapterPickupFile, adapterPickupErr := svc.findLatestReportFile("gitops-adapter-pickup-*.json", "gitops-adapter-pickup-latest.json"); adapterPickupErr == nil {
-		body["latestGitOpsAdapterPickupFile"] = latestGitOpsAdapterPickupFile
-		if latestGitOpsAdapterPickup := svc.readJSONFile(latestGitOpsAdapterPickupFile); latestGitOpsAdapterPickup != nil {
-			body["gitOpsAdapterPickup"] = latestGitOpsAdapterPickup
-		}
-	}
-	if latestGitOpsAdapterPickupAckFile, adapterPickupAckErr := svc.findLatestReportFile("gitops-adapter-pickup-ack-*.json", "gitops-adapter-pickup-ack-latest.json"); adapterPickupAckErr == nil {
-		body["latestGitOpsAdapterPickupAckFile"] = latestGitOpsAdapterPickupAckFile
-		if latestGitOpsAdapterPickupAck := svc.readJSONFile(latestGitOpsAdapterPickupAckFile); latestGitOpsAdapterPickupAck != nil {
-			body["gitOpsAdapterPickupAck"] = latestGitOpsAdapterPickupAck
-		}
-	}
-	if latestGitOpsAdapterHandoffStateFile, handoffStateErr := svc.findLatestReportFile("gitops-adapter-handoff-state-*.json", "gitops-adapter-handoff-state-latest.json"); handoffStateErr == nil {
-		body["latestGitOpsAdapterHandoffStateFile"] = latestGitOpsAdapterHandoffStateFile
-		if latestGitOpsAdapterHandoffState := svc.readJSONFile(latestGitOpsAdapterHandoffStateFile); latestGitOpsAdapterHandoffState != nil {
-			body["gitOpsAdapterHandoffState"] = latestGitOpsAdapterHandoffState
-		}
-	}
-	if latestGitOpsAdapterPickupEventFile, pickupEventErr := svc.findLatestReportFile("gitops-adapter-pickup-event-*.json", "gitops-adapter-pickup-event-latest.json"); pickupEventErr == nil {
-		body["latestGitOpsAdapterPickupEventFile"] = latestGitOpsAdapterPickupEventFile
-		if latestGitOpsAdapterPickupEvent := svc.readJSONFile(latestGitOpsAdapterPickupEventFile); latestGitOpsAdapterPickupEvent != nil {
-			body["gitOpsAdapterPickupEvent"] = latestGitOpsAdapterPickupEvent
-		}
-	}
-	if latestGitOpsAdapterPickupTransitionFile, pickupTransitionErr := svc.findLatestReportFile("gitops-adapter-pickup-transition-*.json", "gitops-adapter-pickup-transition-latest.json"); pickupTransitionErr == nil {
-		body["latestGitOpsAdapterPickupTransitionFile"] = latestGitOpsAdapterPickupTransitionFile
-		if latestGitOpsAdapterPickupTransition := svc.readJSONFile(latestGitOpsAdapterPickupTransitionFile); latestGitOpsAdapterPickupTransition != nil {
-			body["gitOpsAdapterPickupTransition"] = latestGitOpsAdapterPickupTransition
-		}
-	}
-	if latestGitOpsAdapterHandoffPrepFile, handoffPrepErr := svc.findLatestReportFile("gitops-adapter-handoff-prep-*.json", "gitops-adapter-handoff-prep-latest.json"); handoffPrepErr == nil {
-		body["latestGitOpsAdapterHandoffPrepFile"] = latestGitOpsAdapterHandoffPrepFile
-		if latestGitOpsAdapterHandoffPrep := svc.readJSONFile(latestGitOpsAdapterHandoffPrepFile); latestGitOpsAdapterHandoffPrep != nil {
-			body["gitOpsAdapterHandoffPrep"] = latestGitOpsAdapterHandoffPrep
-		}
-	}
-	if latestGitOpsAdapterHandoffProgressFile, handoffProgressErr := svc.findLatestReportFile("gitops-adapter-handoff-progress-*.json", "gitops-adapter-handoff-progress-latest.json"); handoffProgressErr == nil {
-		body["latestGitOpsAdapterHandoffProgressFile"] = latestGitOpsAdapterHandoffProgressFile
-		if latestGitOpsAdapterHandoffProgress := svc.readJSONFile(latestGitOpsAdapterHandoffProgressFile); latestGitOpsAdapterHandoffProgress != nil {
-			body["gitOpsAdapterHandoffProgress"] = latestGitOpsAdapterHandoffProgress
-		}
-	}
-	if latestGitOpsAdapterPayloadFile, payloadErr := svc.findLatestReportFile("gitops-adapter-payload-*.json", "gitops-adapter-payload-latest.json"); payloadErr == nil {
-		body["latestGitOpsAdapterPayloadFile"] = latestGitOpsAdapterPayloadFile
-		if latestGitOpsAdapterPayload := svc.readJSONFile(latestGitOpsAdapterPayloadFile); latestGitOpsAdapterPayload != nil {
-			body["gitOpsAdapterPayload"] = latestGitOpsAdapterPayload
-		}
-	}
-	if latestGitOpsAdapterDispatchFile, dispatchErr := svc.findLatestReportFile("gitops-adapter-dispatch-*.json", "gitops-adapter-dispatch-latest.json"); dispatchErr == nil {
-		body["latestGitOpsAdapterDispatchFile"] = latestGitOpsAdapterDispatchFile
-		if latestGitOpsAdapterDispatch := svc.readJSONFile(latestGitOpsAdapterDispatchFile); latestGitOpsAdapterDispatch != nil {
-			body["gitOpsAdapterDispatch"] = latestGitOpsAdapterDispatch
-		}
-	}
-	if latestGitOpsAdapterProviderRequestFile, providerRequestErr := svc.findLatestReportFile("gitops-adapter-provider-request-*.json", "gitops-adapter-provider-request-latest.json"); providerRequestErr == nil {
-		body["latestGitOpsAdapterProviderRequestFile"] = latestGitOpsAdapterProviderRequestFile
-		if latestGitOpsAdapterProviderRequest := svc.readJSONFile(latestGitOpsAdapterProviderRequestFile); latestGitOpsAdapterProviderRequest != nil {
-			body["gitOpsAdapterProviderRequest"] = latestGitOpsAdapterProviderRequest
-		}
-	}
-	if latestGitOpsAdapterProviderResultFile, providerResultErr := svc.findLatestReportFile("gitops-adapter-provider-result-*.json", "gitops-adapter-provider-result-latest.json"); providerResultErr == nil {
-		body["latestGitOpsAdapterProviderResultFile"] = latestGitOpsAdapterProviderResultFile
-		if latestGitOpsAdapterProviderResult := svc.readJSONFile(latestGitOpsAdapterProviderResultFile); latestGitOpsAdapterProviderResult != nil {
-			body["gitOpsAdapterProviderResult"] = latestGitOpsAdapterProviderResult
-		}
 	}
 
 	return body, nil
@@ -407,265 +252,22 @@ func (svc *ExecutionService) RunNoop(ctx context.Context, releaseID string) (map
 		}
 	}
 
-	gitOpsProposalFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsProposalFile = strings.TrimSpace(extractString(artifacts, "gitopsPatchProposal"))
-		}
-	}
-	if gitOpsProposalFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-patch-proposal-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsProposalFile = candidate
-		}
-	}
-
-	gitOpsBundleFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsBundleFile = strings.TrimSpace(extractString(artifacts, "gitopsPRBundle"))
-		}
-	}
-	if gitOpsBundleFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-pr-bundle-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsBundleFile = candidate
-		}
-	}
-
-	gitOpsHandoffFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsHandoffFile = strings.TrimSpace(extractString(artifacts, "gitopsHandoffBundle"))
-		}
-	}
-	if gitOpsHandoffFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-handoff-bundle-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsHandoffFile = candidate
-		}
-	}
-
-	gitOpsAdapterRequestFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterRequestFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterRequest"))
-		}
-	}
-	if gitOpsAdapterRequestFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-request-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterRequestFile = candidate
-		}
-	}
-
-	gitOpsAdapterResultFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterResultFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterResult"))
-		}
-	}
-	if gitOpsAdapterResultFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-result-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterResultFile = candidate
-		}
-	}
-
-	gitOpsAdapterDeliveryFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterDeliveryFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterDelivery"))
-		}
-	}
-	if gitOpsAdapterDeliveryFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-delivery-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterDeliveryFile = candidate
-		}
-	}
-
-	gitOpsAdapterRunFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterRunFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterRun"))
-		}
-	}
-
-	gitOpsAdapterPickupFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterPickupFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterPickup"))
-		}
-	}
-
-	gitOpsAdapterPickupAckFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterPickupAckFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterPickupAck"))
-		}
-	}
-	if gitOpsAdapterPickupAckFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-pickup-ack-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterPickupAckFile = candidate
-		}
-	}
-	if gitOpsAdapterPickupFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-pickup-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterPickupFile = candidate
-		}
-	}
-	gitOpsAdapterHandoffStateFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterHandoffStateFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterHandoffState"))
-		}
-	}
-	if gitOpsAdapterHandoffStateFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-handoff-state-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterHandoffStateFile = candidate
-		}
-	}
-	gitOpsAdapterPickupEventFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterPickupEventFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterPickupEvent"))
-		}
-	}
-	if gitOpsAdapterPickupEventFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-pickup-event-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterPickupEventFile = candidate
-		}
-	}
-	gitOpsAdapterPickupTransitionFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterPickupTransitionFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterPickupTransition"))
-		}
-	}
-	if gitOpsAdapterPickupTransitionFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-pickup-transition-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterPickupTransitionFile = candidate
-		}
-	}
-	gitOpsAdapterHandoffPrepFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterHandoffPrepFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterHandoffPrep"))
-		}
-	}
-	if gitOpsAdapterHandoffPrepFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-handoff-prep-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterHandoffPrepFile = candidate
-		}
-	}
-	gitOpsAdapterHandoffProgressFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterHandoffProgressFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterHandoffProgress"))
-		}
-	}
-	if gitOpsAdapterHandoffProgressFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-handoff-progress-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterHandoffProgressFile = candidate
-		}
-	}
-	gitOpsAdapterPayloadFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterPayloadFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterPayload"))
-		}
-	}
-	if gitOpsAdapterPayloadFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-payload-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterPayloadFile = candidate
-		}
-	}
-	gitOpsAdapterDispatchFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterDispatchFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterDispatch"))
-		}
-	}
-	if gitOpsAdapterDispatchFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-dispatch-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterDispatchFile = candidate
-		}
-	}
-	gitOpsAdapterProviderRequestFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterProviderRequestFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterProviderRequest"))
-		}
-	}
-	if gitOpsAdapterProviderRequestFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-provider-request-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterProviderRequestFile = candidate
-		}
-	}
-	gitOpsAdapterProviderResultFile := ""
-	if releaseEvidence != nil {
-		if artifacts, ok := releaseEvidence["artifacts"].(map[string]interface{}); ok {
-			gitOpsAdapterProviderResultFile = strings.TrimSpace(extractString(artifacts, "gitopsAdapterProviderResult"))
-		}
-	}
-	if gitOpsAdapterProviderResultFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-provider-result-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterProviderResultFile = candidate
-		}
-	}
-	if gitOpsAdapterRunFile == "" && releaseEvidenceID != "" {
-		candidate := filepath.Join(svc.cfg.ReportDir, "gitops-adapter-run-"+releaseEvidenceID+".json")
-		if _, statErr := os.Stat(candidate); statErr == nil {
-			gitOpsAdapterRunFile = candidate
-		}
-	}
-
 	body := map[string]interface{}{
-		"schemaVersion":                     "execution.noop.run/v1alpha1",
-		"generatedAt":                       time.Now().Format(time.RFC3339),
-		"operation":                         "noop",
-		"runtime":                           svc.runtime.Descriptor(),
-		"controlPlane":                      svc.ControlPlaneMetadataForOperation("noop", true),
-		"readOnly":                          false,
-		"willExecute":                       false,
-		"doesNotModifyCluster":              true,
-		"doesNotModifyGitOps":               true,
-		"doesNotTriggerRollout":             true,
-		"mutatesLocalEvidenceFiles":         true,
-		"releaseEvidenceFile":               releaseEvidenceFile,
-		"executionResultFile":               executionResultFile,
-		"gitOpsProposalFile":                gitOpsProposalFile,
-		"gitOpsBundleFile":                  gitOpsBundleFile,
-		"gitOpsHandoffFile":                 gitOpsHandoffFile,
-		"gitOpsAdapterRequestFile":          gitOpsAdapterRequestFile,
-		"gitOpsAdapterResultFile":           gitOpsAdapterResultFile,
-		"gitOpsAdapterDeliveryFile":         gitOpsAdapterDeliveryFile,
-		"gitOpsAdapterRunFile":              gitOpsAdapterRunFile,
-		"gitOpsAdapterPickupFile":           gitOpsAdapterPickupFile,
-		"gitOpsAdapterPickupAckFile":        gitOpsAdapterPickupAckFile,
-		"gitOpsAdapterHandoffStateFile":     gitOpsAdapterHandoffStateFile,
-		"gitOpsAdapterPickupEventFile":      gitOpsAdapterPickupEventFile,
-		"gitOpsAdapterPickupTransitionFile": gitOpsAdapterPickupTransitionFile,
-		"gitOpsAdapterHandoffPrepFile":      gitOpsAdapterHandoffPrepFile,
-		"gitOpsAdapterHandoffProgressFile":  gitOpsAdapterHandoffProgressFile,
-		"gitOpsAdapterPayloadFile":          gitOpsAdapterPayloadFile,
-		"gitOpsAdapterDispatchFile":         gitOpsAdapterDispatchFile,
-		"gitOpsAdapterProviderRequestFile":  gitOpsAdapterProviderRequestFile,
-		"gitOpsAdapterProviderResultFile":   gitOpsAdapterProviderResultFile,
-		"evidenceRecordFile":                evidenceRecordFile,
-		"scriptOutput":                      decodeExecutionOutput(output),
+		"schemaVersion":             "execution.noop.run/v1alpha1",
+		"generatedAt":               time.Now().Format(time.RFC3339),
+		"operation":                 "noop",
+		"runtime":                   svc.runtime.Descriptor(),
+		"controlPlane":              svc.ControlPlaneMetadataForOperation("noop", true),
+		"readOnly":                  false,
+		"willExecute":               false,
+		"doesNotModifyCluster":      true,
+		"doesNotModifyGitOps":       true,
+		"doesNotTriggerRollout":     true,
+		"mutatesLocalEvidenceFiles": true,
+		"releaseEvidenceFile":       releaseEvidenceFile,
+		"executionResultFile":       executionResultFile,
+		"evidenceRecordFile":        evidenceRecordFile,
+		"scriptOutput":              decodeExecutionOutput(output),
 	}
 
 	if releaseEvidence != nil {
@@ -673,60 +275,6 @@ func (svc *ExecutionService) RunNoop(ctx context.Context, releaseID string) (map
 	}
 	if executionResult := svc.readJSONFile(executionResultFile); executionResult != nil {
 		body["executionResult"] = executionResult
-	}
-	if gitOpsProposal := svc.readJSONFile(gitOpsProposalFile); gitOpsProposal != nil {
-		body["gitOpsProposal"] = gitOpsProposal
-	}
-	if gitOpsBundle := svc.readJSONFile(gitOpsBundleFile); gitOpsBundle != nil {
-		body["gitOpsBundle"] = gitOpsBundle
-	}
-	if gitOpsHandoff := svc.readJSONFile(gitOpsHandoffFile); gitOpsHandoff != nil {
-		body["gitOpsHandoff"] = gitOpsHandoff
-	}
-	if gitOpsAdapterRequest := svc.readJSONFile(gitOpsAdapterRequestFile); gitOpsAdapterRequest != nil {
-		body["gitOpsAdapterRequest"] = gitOpsAdapterRequest
-	}
-	if gitOpsAdapterResult := svc.readJSONFile(gitOpsAdapterResultFile); gitOpsAdapterResult != nil {
-		body["gitOpsAdapterResult"] = gitOpsAdapterResult
-	}
-	if gitOpsAdapterDelivery := svc.readJSONFile(gitOpsAdapterDeliveryFile); gitOpsAdapterDelivery != nil {
-		body["gitOpsAdapterDelivery"] = gitOpsAdapterDelivery
-	}
-	if gitOpsAdapterRun := svc.readJSONFile(gitOpsAdapterRunFile); gitOpsAdapterRun != nil {
-		body["gitOpsAdapterRun"] = gitOpsAdapterRun
-	}
-	if gitOpsAdapterPickup := svc.readJSONFile(gitOpsAdapterPickupFile); gitOpsAdapterPickup != nil {
-		body["gitOpsAdapterPickup"] = gitOpsAdapterPickup
-	}
-	if gitOpsAdapterPickupAck := svc.readJSONFile(gitOpsAdapterPickupAckFile); gitOpsAdapterPickupAck != nil {
-		body["gitOpsAdapterPickupAck"] = gitOpsAdapterPickupAck
-	}
-	if gitOpsAdapterHandoffState := svc.readJSONFile(gitOpsAdapterHandoffStateFile); gitOpsAdapterHandoffState != nil {
-		body["gitOpsAdapterHandoffState"] = gitOpsAdapterHandoffState
-	}
-	if gitOpsAdapterPickupEvent := svc.readJSONFile(gitOpsAdapterPickupEventFile); gitOpsAdapterPickupEvent != nil {
-		body["gitOpsAdapterPickupEvent"] = gitOpsAdapterPickupEvent
-	}
-	if gitOpsAdapterPickupTransition := svc.readJSONFile(gitOpsAdapterPickupTransitionFile); gitOpsAdapterPickupTransition != nil {
-		body["gitOpsAdapterPickupTransition"] = gitOpsAdapterPickupTransition
-	}
-	if gitOpsAdapterHandoffPrep := svc.readJSONFile(gitOpsAdapterHandoffPrepFile); gitOpsAdapterHandoffPrep != nil {
-		body["gitOpsAdapterHandoffPrep"] = gitOpsAdapterHandoffPrep
-	}
-	if gitOpsAdapterHandoffProgress := svc.readJSONFile(gitOpsAdapterHandoffProgressFile); gitOpsAdapterHandoffProgress != nil {
-		body["gitOpsAdapterHandoffProgress"] = gitOpsAdapterHandoffProgress
-	}
-	if gitOpsAdapterPayload := svc.readJSONFile(gitOpsAdapterPayloadFile); gitOpsAdapterPayload != nil {
-		body["gitOpsAdapterPayload"] = gitOpsAdapterPayload
-	}
-	if gitOpsAdapterDispatch := svc.readJSONFile(gitOpsAdapterDispatchFile); gitOpsAdapterDispatch != nil {
-		body["gitOpsAdapterDispatch"] = gitOpsAdapterDispatch
-	}
-	if gitOpsAdapterProviderRequest := svc.readJSONFile(gitOpsAdapterProviderRequestFile); gitOpsAdapterProviderRequest != nil {
-		body["gitOpsAdapterProviderRequest"] = gitOpsAdapterProviderRequest
-	}
-	if gitOpsAdapterProviderResult := svc.readJSONFile(gitOpsAdapterProviderResultFile); gitOpsAdapterProviderResult != nil {
-		body["gitOpsAdapterProviderResult"] = gitOpsAdapterProviderResult
 	}
 	if evidenceRecord := svc.readJSONFile(evidenceRecordFile); evidenceRecord != nil {
 		body["evidenceRecord"] = evidenceRecord
