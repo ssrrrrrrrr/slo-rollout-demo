@@ -18,10 +18,12 @@ type GroupItem = {
 const groupedResources: Record<string, { title: string; description: string; items: GroupItem[] }> = {
   "Runtime Actions": {
     title: "Runtime Actions",
-    description: "Controlled runtime action evidence grouped by decision, preview, execution, and safety boundary.",
+    description: "Controlled runtime action evidence grouped by recommendation, request, preflight, execution, and safety boundary.",
     items: [
-      { label: "Action Plan", kind: "preview", description: "Dry-run action plan or execution preview." },
-      { label: "Execution Result", kind: "execution-result", description: "Executor result, receipt, and verification artifact." },
+      { label: "Recommendation", kind: "runtime-action-recommendation", description: "Read-only runtime action recommendation." },
+      { label: "Request", kind: "runtime-action-request", description: "Policy-bound runtime action request." },
+      { label: "Preflight", kind: "runtime-action-preflight", description: "Runtime action eligibility and safety checks." },
+      { label: "Execution Result", kind: "runtime-action-execution-result", description: "Runtime Action result, receipt, and verification artifact." },
       { label: "Policy Decision", kind: "policy-decision", description: "Policy decision used before runtime execution." },
       { label: "AI Decision", kind: "ai-decision", description: "Advisor decision that may recommend an action." },
     ],

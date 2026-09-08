@@ -111,30 +111,6 @@ RESOURCE_SPECS = [
         "id_prefix": "er-",
     },
     {
-        "object_type": "executionEligibility",
-        "glob": "execution-eligibility-*.json",
-        "latest": "execution-eligibility-latest.json",
-        "prefix": "execution-eligibility-",
-        "id_key": "eligibilityDecisionId",
-        "id_prefix": "el-",
-    },
-    {
-        "object_type": "executionPreview",
-        "glob": "execution-preview-*.json",
-        "latest": "execution-preview-latest.json",
-        "prefix": "execution-preview-",
-        "id_key": "executionPreviewId",
-        "id_prefix": "ep-",
-    },
-    {
-        "object_type": "executionResult",
-        "glob": "execution-result-*.json",
-        "latest": "execution-result-latest.json",
-        "prefix": "execution-result-",
-        "id_key": "executionResultId",
-        "id_prefix": "xr-",
-    },
-    {
         "object_type": "policyInput",
         "schema_version": "policy.input/v1alpha1",
         "prefix": "policy-input-",
@@ -400,9 +376,6 @@ def derive_object_id(
         as_dict(data.get("agent")).get("agentRunId"),
         as_dict(data.get("plan")).get("planRunId"),
         as_dict(data.get("executionRequest")).get("executionRequestId"),
-        as_dict(data.get("executionEligibility")).get("eligibilityDecisionId"),
-        as_dict(data.get("executionPreview")).get("executionPreviewId"),
-        as_dict(data.get("executionResult")).get("executionResultId"),
         as_dict(data.get("supplyChain")).get("supplyChainDecisionId"),
     ]
 
@@ -936,74 +909,6 @@ def compact_object_summary(object_type: str, data: dict[str, Any]) -> dict[str, 
         result["deniedReasons"] = data.get("deniedReasons") or []
         result["approvalRequiredReasons"] = data.get("approvalRequiredReasons") or []
         result["willExecute"] = pick(safety.get("willExecute"), result.get("willExecute"))
-
-    if object_type == "executionEligibility":
-        eligibility_decision = as_dict(data.get("decision"))
-        eligibility_request = as_dict(data.get("executionRequest"))
-        eligibility_approval = as_dict(data.get("approval"))
-        eligibility_supply_chain = as_dict(data.get("supplyChain"))
-        eligibility_signed_gate = as_dict(data.get("signedReleaseGate"))
-
-        result["finalStatus"] = eligibility_decision.get("finalStatus")
-        result["readyToExecute"] = eligibility_decision.get("readyToExecute")
-        result["requestedAction"] = pick(
-            eligibility_request.get("requestedAction"),
-            result.get("requestedAction"),
-        )
-        result["requestStatus"] = pick(
-            eligibility_request.get("requestStatus"),
-            result.get("requestStatus"),
-        )
-        result["lifecycleStage"] = eligibility_request.get("lifecycleStage")
-        result["approvalStatus"] = eligibility_approval.get("status")
-        result["approvalDecision"] = eligibility_approval.get("approvalDecision")
-        result["approver"] = eligibility_approval.get("approver")
-        result["supplyChainDecision"] = eligibility_supply_chain.get("decision")
-        result["signedReleaseGateDecision"] = eligibility_signed_gate.get("decision")
-        result["blockingReasons"] = eligibility_decision.get("blockingReasons") or []
-        result["approvalReasons"] = eligibility_decision.get("approvalReasons") or []
-        result["missingInputs"] = eligibility_decision.get("missingInputs") or []
-        result["willExecute"] = pick(
-            as_dict(data.get("guardrails")).get("willExecute"),
-            result.get("willExecute"),
-        )
-
-    if object_type == "executionPreview":
-        preview = as_dict(data.get("preview"))
-        rollout_plan = as_dict(preview.get("rolloutPlan"))
-
-        result["previewStatus"] = preview.get("previewStatus")
-        result["readyToExecute"] = preview.get("readyToExecute")
-        result["requestedAction"] = pick(
-            preview.get("requestedAction"),
-            result.get("requestedAction"),
-        )
-        result["plannedActionCount"] = len(as_list(preview.get("plannedActions")))
-        result["blockedActionCount"] = len(as_list(preview.get("blockedActions")))
-        result["humanCheckpointCount"] = len(as_list(preview.get("humanCheckpoints")))
-        result["gitopsChangeCount"] = len(as_list(preview.get("gitopsChanges")))
-        result["strategyType"] = rollout_plan.get("strategyType")
-        result["renderedArtifacts"] = rollout_plan.get("renderedArtifacts")
-        result["willExecute"] = pick(
-            as_dict(data.get("guardrails")).get("willExecute"),
-            result.get("willExecute"),
-        )
-
-    if object_type == "executionResult":
-        result["executionStatus"] = result_body.get("executionStatus")
-        result["readyForExecution"] = result_body.get("readyForExecution")
-        result["requestedAction"] = pick(
-            result_body.get("requestedAction"),
-            result.get("requestedAction"),
-        )
-        result["executedActionCount"] = len(as_list(result_body.get("executedActions")))
-        result["blockedActionCount"] = len(as_list(result_body.get("blockedActions")))
-        result["executorAdapter"] = executor.get("adapter")
-        result["willExecute"] = pick(
-            as_dict(data.get("guardrails")).get("willExecute"),
-            executor.get("willExecute"),
-            result.get("willExecute"),
-        )
 
     if verification_summary:
         result["verification"] = verification_summary

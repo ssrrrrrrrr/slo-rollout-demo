@@ -326,24 +326,6 @@ execution_evidence = as_dict(execution_request.get("evidence"))
 execution_evidence_artifacts = as_dict(execution_evidence.get("artifacts"))
 execution_guardrails = as_dict(execution_request.get("guardrails"))
 
-execution_eligibility_path = resolve_ref(artifacts.get("executionEligibility"), evidence_path)
-execution_eligibility = load_json(execution_eligibility_path)
-execution_eligibility_decision = as_dict(execution_eligibility.get("decision"))
-execution_eligibility_guardrails = as_dict(execution_eligibility.get("guardrails"))
-
-execution_preview_path = resolve_ref(artifacts.get("executionPreview"), evidence_path)
-execution_preview = load_json(execution_preview_path)
-execution_preview_body = as_dict(execution_preview.get("preview"))
-execution_preview_rollout = as_dict(execution_preview_body.get("rolloutPlan"))
-execution_preview_guardrails = as_dict(execution_preview.get("guardrails"))
-
-execution_result_path = resolve_ref(artifacts.get("executionResult"), evidence_path)
-execution_result = load_json(execution_result_path)
-execution_result_body = as_dict(execution_result.get("result"))
-execution_result_executor = as_dict(execution_result.get("executor"))
-execution_result_evidence = as_dict(execution_result_body.get("evidenceArtifacts"))
-execution_result_guardrails = as_dict(execution_result.get("guardrails"))
-
 rollout_runtime_inspect_path = resolve_ref(artifacts.get("rolloutRuntimeInspect"), evidence_path)
 rollout_runtime_inspect = load_json(rollout_runtime_inspect_path)
 rollout_runtime_target = as_dict(rollout_runtime_inspect.get("target"))
@@ -450,9 +432,6 @@ link_map = {
     "otelSpanBundle": artifacts.get("otelSpanBundle"),
     "planRun": artifacts.get("planRun"),
     "executionRequest": artifacts.get("executionRequest"),
-    "executionEligibility": artifacts.get("executionEligibility"),
-    "executionPreview": artifacts.get("executionPreview"),
-    "executionResult": artifacts.get("executionResult"),
     "rolloutRuntimeInspect": artifacts.get("rolloutRuntimeInspect"),
     "runtimeActionRecommendation": artifacts.get("runtimeActionRecommendation"),
     "runtimeActionRequest": artifacts.get("runtimeActionRequest"),
@@ -481,9 +460,6 @@ artifact_defs = [
     ("otelSpanBundle", link_map["otelSpanBundle"], False),
     ("planRun", link_map["planRun"], False),
     ("executionRequest", link_map["executionRequest"], False),
-    ("executionEligibility", link_map["executionEligibility"], False),
-    ("executionPreview", link_map["executionPreview"], False),
-    ("executionResult", link_map["executionResult"], False),
     ("rolloutRuntimeInspect", link_map["rolloutRuntimeInspect"], False),
     ("runtimeActionRecommendation", link_map["runtimeActionRecommendation"], False),
     ("runtimeActionRequest", link_map["runtimeActionRequest"], False),
@@ -652,56 +628,6 @@ record = {
             execution_evidence_artifacts.get("approvalRecordReport"),
         )),
         "guardrails": execution_guardrails,
-    },
-    "executionEligibility": {
-        "eligibilityDecisionId": nullable_string(execution_eligibility.get("eligibilityDecisionId")),
-        "mode": nullable_string(execution_eligibility.get("mode")),
-        "finalStatus": nullable_string(execution_eligibility_decision.get("finalStatus")),
-        "readyToExecute": bool_or_none(execution_eligibility_decision.get("readyToExecute")),
-        "requestedAction": nullable_string(as_dict(execution_eligibility.get("executionRequest")).get("requestedAction")),
-        "requestStatus": nullable_string(as_dict(execution_eligibility.get("executionRequest")).get("requestStatus")),
-        "lifecycleStage": nullable_string(as_dict(execution_eligibility.get("executionRequest")).get("lifecycleStage")),
-        "approvalStatus": nullable_string(as_dict(execution_eligibility.get("approval")).get("status")),
-        "approvalDecision": nullable_string(as_dict(execution_eligibility.get("approval")).get("approvalDecision")),
-        "approver": nullable_string(as_dict(execution_eligibility.get("approval")).get("approver")),
-        "supplyChainDecision": nullable_string(as_dict(execution_eligibility.get("supplyChain")).get("decision")),
-        "signedReleaseGateDecision": nullable_string(as_dict(execution_eligibility.get("signedReleaseGate")).get("decision")),
-        "blockingReasons": [str(item) for item in as_list(execution_eligibility_decision.get("blockingReasons"))],
-        "approvalReasons": [str(item) for item in as_list(execution_eligibility_decision.get("approvalReasons"))],
-        "missingInputs": [str(item) for item in as_list(execution_eligibility_decision.get("missingInputs"))],
-        "sourceExecutionEligibility": nullable_string(link_map.get("executionEligibility")),
-        "guardrails": execution_eligibility_guardrails,
-    },
-    "executionPreview": {
-        "executionPreviewId": nullable_string(execution_preview.get("executionPreviewId")),
-        "mode": nullable_string(execution_preview.get("mode")),
-        "previewStatus": nullable_string(execution_preview_body.get("previewStatus")),
-        "readyToExecute": bool_or_none(execution_preview_body.get("readyToExecute")),
-        "requestedAction": nullable_string(execution_preview_body.get("requestedAction")),
-        "plannedActionCount": len(as_list(execution_preview_body.get("plannedActions"))),
-        "blockedActionCount": len(as_list(execution_preview_body.get("blockedActions"))),
-        "humanCheckpointCount": len(as_list(execution_preview_body.get("humanCheckpoints"))),
-        "gitopsChangeCount": len(as_list(execution_preview_body.get("gitopsChanges"))),
-        "renderedArtifactCount": execution_preview_rollout.get("renderedArtifacts"),
-        "sourceExecutionPreview": nullable_string(link_map.get("executionPreview")),
-        "renderedReleasePlan": nullable_string(first_not_none(
-            as_dict(execution_preview.get("inputs")).get("renderedReleasePlan"),
-            as_dict(decision_refs.get("executionPreview")).get("renderedReleasePlan"),
-        )),
-        "guardrails": execution_preview_guardrails,
-    },
-    "executionResult": {
-        "executionResultId": nullable_string(execution_result.get("executionResultId")),
-        "mode": nullable_string(execution_result.get("mode")),
-        "executionStatus": nullable_string(execution_result_body.get("executionStatus")),
-        "readyForExecution": bool_or_none(execution_result_body.get("readyForExecution")),
-        "requestedAction": nullable_string(execution_result_body.get("requestedAction")),
-        "executedActionCount": len(as_list(execution_result_body.get("executedActions"))),
-        "blockedActionCount": len(as_list(execution_result_body.get("blockedActions"))),
-        "executorAdapter": nullable_string(execution_result_executor.get("adapter")),
-        "sourceExecutionResult": nullable_string(link_map.get("executionResult")),
-        "sourceExecutionPreview": nullable_string(execution_result_evidence.get("sourceExecutionPreview")),
-        "guardrails": execution_result_guardrails,
     },
     "rolloutRuntimeInspect": {
         "rolloutRuntimeInspectId": nullable_string(rollout_runtime_inspect.get("rolloutRuntimeInspectId")),

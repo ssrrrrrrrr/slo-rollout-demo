@@ -10,7 +10,7 @@ export type ReleaseTabDefinition = {
 export const releaseTabs: ReleaseTabDefinition[] = [
   { id: "概览", resourceKind: "summary", targetRoute: "Releases" },
   { id: "Evidence", resourceKind: "evidence", targetRoute: "Releases" },
-  { id: "Runtime Action", resourceKind: "execution-result", targetRoute: "Releases" },
+  { id: "Runtime Action", resourceKind: "runtime-action-execution-result", targetRoute: "Releases" },
   { id: "Timeline", resourceKind: "timeline", targetRoute: "Releases" },
 ]
 

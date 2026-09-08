@@ -13,7 +13,6 @@ import (
 type portalAPI struct {
 	cfg            Config
 	reportDir      string
-	executionSvc   *ExecutionService
 	serviceSvc     *ServiceService
 	sloSvc         *SLOService
 	runtimeSvc     *RuntimeService
@@ -122,10 +121,6 @@ func registerPortalAPIHandlersForAPI(mux *http.ServeMux, api *portalAPI) {
 	mux.HandleFunc("/api/evidence/search", api.handleEvidenceSearch)
 	mux.HandleFunc("/api/evidence/verification-summary", api.handleEvidenceVerificationSummary)
 	mux.HandleFunc("/api/evidence/graph", api.handleEvidenceGraph)
-	mux.HandleFunc("/api/execution/status", api.handleExecutionStatus)
-	mux.HandleFunc("/api/execution/latest", api.handleExecutionLatest)
-	mux.HandleFunc("/api/execution/noop", api.handleExecutionNoop)
-
 	// Backward-compatible Stage41/42 EvidenceStore routes.
 	mux.HandleFunc("/api/evidence-store/releases", api.handleEvidenceStoreReleaseList)
 	mux.HandleFunc("/api/evidence-store/releases/", api.handleEvidenceStoreReleaseDetail)
@@ -137,8 +132,6 @@ func registerPortalAPIHandlersForAPI(mux *http.ServeMux, api *portalAPI) {
 	mux.HandleFunc("/api/releases/latest/intelligence", api.handleLatestResource("releaseIntelligence"))
 	mux.HandleFunc("/api/releases/latest/approval", api.handleLatestResource("approvalRecord"))
 	mux.HandleFunc("/api/releases/latest/failure-evidence", api.handleLatestResource("failureEvidence"))
-	mux.HandleFunc("/api/releases/latest/preview", api.handleLatestResource("executionPreview"))
-	mux.HandleFunc("/api/releases/latest/execution-result", api.handleLatestResource("executionResult"))
 	mux.HandleFunc("/api/releases/latest/rollout-runtime-inspect", api.handleLatestResource("rolloutRuntimeInspect"))
 	mux.HandleFunc("/api/releases/latest/runtime-action-recommendation", api.handleLatestResource("runtimeActionRecommendation"))
 	mux.HandleFunc("/api/releases/latest/runtime-action-request", api.handleLatestResource("runtimeActionRequest"))
@@ -200,22 +193,6 @@ func portalResourceDefs() []portalResourceDef {
 			FallbackGlob: "approval-record-*.json",
 			ContentType:  "application/json; charset=utf-8",
 			Description:  "Latest human approval record.",
-		},
-		{
-			Name:         "executionPreview",
-			Endpoint:     "/api/releases/latest/preview",
-			Candidates:   []string{"execution-preview-latest.json"},
-			FallbackGlob: "execution-preview-*.json",
-			ContentType:  "application/json; charset=utf-8",
-			Description:  "Latest dry-run execution preview.",
-		},
-		{
-			Name:         "executionResult",
-			Endpoint:     "/api/releases/latest/execution-result",
-			Candidates:   []string{"execution-result-latest.json"},
-			FallbackGlob: "execution-result-*.json",
-			ContentType:  "application/json; charset=utf-8",
-			Description:  "Latest controlled executor result.",
 		},
 		{
 			Name:         "rolloutRuntimeInspect",
@@ -519,79 +496,6 @@ func (api *portalAPI) handleEvidenceGraph(w http.ResponseWriter, r *http.Request
 			ReleaseID: releaseID,
 		})
 	})
-}
-
-func (api *portalAPI) handleExecutionStatus(w http.ResponseWriter, r *http.Request) {
-	if !api.requireGET(w, r) {
-		return
-	}
-
-	writePortalJSON(w, http.StatusOK, api.executionService().Status(r.Context()))
-}
-
-func (api *portalAPI) handleExecutionLatest(w http.ResponseWriter, r *http.Request) {
-	if !api.requireGET(w, r) {
-		return
-	}
-
-	body, err := api.executionService().Latest(r.Context())
-	if err != nil {
-		writePortalJSON(w, http.StatusNotFound, map[string]interface{}{
-			"schemaVersion":             "execution.noop.latest.error/v1alpha1",
-			"generatedAt":               time.Now().Format(time.RFC3339),
-			"error":                     err.Error(),
-			"controlPlane":              api.executionService().ControlPlaneMetadataForOperation("latest-error", false),
-			"readOnly":                  true,
-			"willExecute":               false,
-			"doesNotModifyCluster":      true,
-			"doesNotModifyGitOps":       true,
-			"doesNotTriggerRollout":     true,
-			"mutatesLocalEvidenceFiles": false,
-		})
-		return
-	}
-
-	writePortalJSON(w, http.StatusOK, body)
-}
-
-func (api *portalAPI) handleExecutionNoop(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writePortalJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{
-			"schemaVersion":             "execution.noop.run.error/v1alpha1",
-			"generatedAt":               time.Now().Format(time.RFC3339),
-			"error":                     "method not allowed",
-			"allowedMethod":             "POST",
-			"controlPlane":              api.executionService().ControlPlaneMetadataForOperation("noop", true),
-			"readOnly":                  false,
-			"willExecute":               false,
-			"doesNotModifyCluster":      true,
-			"doesNotModifyGitOps":       true,
-			"doesNotTriggerRollout":     true,
-			"mutatesLocalEvidenceFiles": true,
-		})
-		return
-	}
-
-	releaseID := strings.TrimSpace(r.URL.Query().Get("releaseId"))
-	body, err := api.executionService().RunNoop(r.Context(), releaseID)
-	if err != nil {
-		writePortalJSON(w, http.StatusConflict, map[string]interface{}{
-			"schemaVersion":             "execution.noop.run.error/v1alpha1",
-			"generatedAt":               time.Now().Format(time.RFC3339),
-			"error":                     err.Error(),
-			"releaseId":                 releaseID,
-			"controlPlane":              api.executionService().ControlPlaneMetadataForOperation("noop", true),
-			"readOnly":                  false,
-			"willExecute":               false,
-			"doesNotModifyCluster":      true,
-			"doesNotModifyGitOps":       true,
-			"doesNotTriggerRollout":     true,
-			"mutatesLocalEvidenceFiles": true,
-		})
-		return
-	}
-
-	writePortalJSON(w, http.StatusOK, body)
 }
 
 func evidencePathSuffix(path string, prefixes ...string) string {
@@ -926,10 +830,6 @@ func portalResourceKindFromPathSegment(resourceName string) (string, string, boo
 		return "releaseIntelligence", "application/json; charset=utf-8", true
 	case "approval":
 		return "approvalRecord", "application/json; charset=utf-8", true
-	case "preview":
-		return "executionPreview", "application/json; charset=utf-8", true
-	case "execution-result":
-		return "executionResult", "application/json; charset=utf-8", true
 	case "rollout-runtime-inspect":
 		return "rolloutRuntimeInspect", "application/json; charset=utf-8", true
 	case "runtime-action-recommendation":
@@ -940,8 +840,6 @@ func portalResourceKindFromPathSegment(resourceName string) (string, string, boo
 		return "runtimeActionPreflight", "application/json; charset=utf-8", true
 	case "runtime-action-execution-result":
 		return "runtimeActionExecutionResult", "application/json; charset=utf-8", true
-	case "eligibility":
-		return "executionEligibility", "application/json; charset=utf-8", true
 	case "failure-evidence":
 		return "failureEvidence", "application/json; charset=utf-8", true
 	case "advice":
@@ -975,14 +873,11 @@ func availablePortalResourceNames(group *portalReleaseGroup) []string {
 		"actionPlan":                   "action-plan",
 		"releaseIntelligence":          "intelligence",
 		"approvalRecord":               "approval",
-		"executionPreview":             "preview",
-		"executionResult":              "execution-result",
 		"rolloutRuntimeInspect":        "rollout-runtime-inspect",
 		"runtimeActionRecommendation":  "runtime-action-recommendation",
 		"runtimeActionRequest":         "runtime-action-request",
 		"runtimeActionPreflight":       "runtime-action-preflight",
 		"runtimeActionExecutionResult": "runtime-action-execution-result",
-		"executionEligibility":         "eligibility",
 		"failureEvidence":              "failure-evidence",
 		"aiAdvice":                     "advice",
 		"aiDecision":                   "ai-decision",
@@ -1078,9 +973,6 @@ func (api *portalAPI) listPortalReportResources() []portalReleaseResource {
 		"action-plan-*.json",
 		"release-intelligence-*.json",
 		"approval-record-*.json",
-		"execution-preview-*.json",
-		"execution-result-*.json",
-		"execution-eligibility-*.json",
 		"failure-evidence-*.json",
 		"ai-advice-*.md",
 		"ai-decision-*.json",
@@ -1306,14 +1198,11 @@ func releaseIDFromReportFile(base string) string {
 		"action-plan-",
 		"release-intelligence-",
 		"approval-record-",
-		"execution-preview-",
-		"execution-result-",
 		"rollout-runtime-inspect-",
 		"runtime-action-recommendation-",
 		"runtime-action-request-",
 		"runtime-action-preflight-",
 		"runtime-action-execution-result-",
-		"execution-eligibility-",
 		"failure-evidence-",
 		"ai-advice-",
 		"ai-decision-",
@@ -1454,10 +1343,6 @@ func kindFromReportFile(base string) string {
 		return "releaseIntelligence"
 	case strings.HasPrefix(base, "approval-record-"):
 		return "approvalRecord"
-	case strings.HasPrefix(base, "execution-preview-"):
-		return "executionPreview"
-	case strings.HasPrefix(base, "execution-result-"):
-		return "executionResult"
 	case strings.HasPrefix(base, "rollout-runtime-inspect-"):
 		return "rolloutRuntimeInspect"
 	case strings.HasPrefix(base, "runtime-action-recommendation-"):
@@ -1468,8 +1353,6 @@ func kindFromReportFile(base string) string {
 		return "runtimeActionPreflight"
 	case strings.HasPrefix(base, "runtime-action-execution-result-"):
 		return "runtimeActionExecutionResult"
-	case strings.HasPrefix(base, "execution-eligibility-"):
-		return "executionEligibility"
 	case strings.HasPrefix(base, "failure-evidence-"):
 		return "failureEvidence"
 	case strings.HasPrefix(base, "ai-advice-"):
