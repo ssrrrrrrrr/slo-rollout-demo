@@ -1,53 +1,20 @@
-# Runtime Action 合同审计
+# Runtime Action 合约
 
-## 结论
+Release Runtime Action 是保留的兼容执行链，支持 `PAUSE`、`RESUME`、`PROMOTE`、`ABORT` 与 `ROLLBACK`。它既可由 Release 工作区使用，也可被受控恢复通过适配层复用。
 
-pause、resume、promote、abort、rollback 五类 runtime action 主链路已经基本闭环。
+## 执行边界
 
-当前阶段不再继续补动作，而是进入统一收口和上线前硬化。
+受控恢复不会重新实现 Runtime Action，也不会直接拼接或调用 kubectl。它在动作可执行前完成 Runbook、Policy、Approval、Preflight 与 Runtime Gate 校验，再委托现有 Runtime Action Pipeline。
 
-## 当前统一链路
+Pipeline 的 Execution Result（动作、状态、开始/结束时间、原因、目标与后置状态）被投射为受控操作与恢复验证信息。退出码本身不代表恢复完成；仍以既有 post-state verification、RuntimeService 和 SLOService 结果为准。
 
-Recommendation
--> Request
--> Preflight
--> ExecutionResult
--> PostActionVerification
--> EvidenceStore / EvidenceRecord / Portal
+## 安全约束
 
-## 当前已有统一区域
+- 全局 runtime execution gate、动作审批、动作 allow gate 与 execute gate 均须通过。
+- Preview 只产生资格与计划信息，绝不调用真实执行适配层。
+- Gate、Policy 或 Approval 任一层不满足时，不调用 Runtime Action Pipeline。
+- 执行器不可用时返回受识别的阻塞状态，不伪造成功。
 
-- action
-- writeGate
-- postActionVerification
-- result
-- receipt
-- guardrails
-- evidenceRefs
+## Release 相关性
 
-## 当前主要差异
-
-目前仍然依赖动作专属字段：
-
-- didPause / pauseVerified
-- didResume / resumeVerified
-- didPromote / promoteVerified
-- didAbort / abortVerified
-- didRollback / rollbackVerified
-
-这些字段先保留，避免破坏已有 EvidenceStore、Portal 和测试。
-
-## 下一步统一方向
-
-优先新增统一摘要字段，不删除旧字段：
-
-- executionSummary
-- gateSummary
-- verificationSummary
-- riskSummary
-
-## Stage 4 原则
-
-先兼容式新增，再逐步迁移 Portal 和 Evidence 消费逻辑。
-
-目标是从“五条动作分别能跑”，升级为“一套统一、可信、可审计的 runtime action 子系统”。
+失败 Release 只有在 freshness window 内才可作为当前 Incident 的主触发器。过期或缺失时间戳的失败 Release 仍可作为历史关联证据，但不能单独升级当前风险或触发活动 Incident。

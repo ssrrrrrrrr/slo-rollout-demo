@@ -1,66 +1,36 @@
-# S Sentinel Demo Runbook
+# S Sentinel 演示流程
 
-This is the representative v1.0 demo: recovery from a Runtime failure without
-a related Release. It demonstrates the Service Reliability loop rather than a
-Release-only workflow.
+## 主流程：无新 Release 的 Runtime 故障
 
-Keep all recovery and Runtime Action gates disabled for normal observation and
-preview. Enabling a real mutation is an explicit, separate operator decision.
+本演示验证 S Sentinel 能从持续可靠性信号进入受控恢复，而不依赖新的 Release。
 
-## Runtime failure without Release
-
-1. Open **Overview**, then **Services**, and select `demo-app` while Runtime is HEALTHY.
-2. Cause the demo Rollout to become UNHEALTHY without creating a related Release.
-3. The **Reliability Controller** reconciles the Service.
-4. A durable Incident episode and timeline are created; its state is **ACTIVE**.
-5. Open the Incident and request **Reliability Agent** analysis.
-6. The expected diagnosis is `RUNTIME_FAILURE`.
-7. The Agent recommends the registered `restart-unhealthy-workload` Runbook.
-8. Open the Recovery Plan and inspect action, target, policy, gates, and preflight.
-9. Use **Preview Recovery**. This is read-only and must not mutate Kubernetes.
-10. With policy and preflight satisfied, a human explicitly approves the current Plan.
-11. Only in a separately authorized environment, select **Execute RESTART_WORKLOAD**.
-12. A durable ControlledOperation is created and enters `EXECUTING`.
-13. The Kubernetes recovery adapter applies the Rollout restart.
-14. Runtime shows the workload rebuilding.
-15. The Incident moves to **RECOVERING** while verification is pending.
-16. Runtime returns to HEALTHY.
-17. Verification reports **RECOVERED**.
-18. The Incident reaches **RESOLVED**.
-19. Inspect the Incident timeline for the complete history and the durable
-    Operation state returned by the Recovery API.
-
-The key point is that no related Release is required for this recovery path.
-
-## Safety prerequisites for a real action
-
-Do not enable these variables merely to complete a demonstration. A real action
-also requires an applicable Runbook, Policy allow, valid human approval, and
-preflight readiness:
+1. Runtime 发现工作负载 `UNHEALTHY`。
+2. Reliability Controller reconcile Service，并创建 `ACTIVE` Incident。
+3. LLM Diagnosis 解释 Incident 证据，并推荐已注册的 `restart-unhealthy-workload` Runbook。
+4. 用户预览 Recovery Plan；预览只做 eligibility、preflight 与计划，不产生 Kubernetes 变更。
+5. 用户对当前确定性 plan 进行人工审批。
+6. 在 Policy、Approval、Recovery Gate、Action Gate 与 Preflight 全部通过后，执行 `RESTART_WORKLOAD`。
+7. ControlledOperation 进入 `EXECUTING`，并在 Durable Operation Ledger 中记录状态。
+8. Runtime 进入 `RECOVERING`；Verification 同时检查 Runtime 和 SLO。
+9. 验证通过后操作为 `RECOVERED`，Incident 进入 `RESOLVED`。
 
 ```text
-S_SENTINEL_RECOVERY_ENABLED=true
-S_SENTINEL_ALLOW_RECOVERY_<ACTION>=true
+Runtime UNHEALTHY
+  → Controller reconcile
+  → Incident ACTIVE
+  → LLM Diagnosis
+  → restart-unhealthy-workload
+  → Preview
+  → Human Approval
+  → RESTART_WORKLOAD
+  → Operation EXECUTING
+  → Runtime RECOVERING
+  → Verification RECOVERED
+  → Incident RESOLVED
 ```
 
-Release-derived Runtime Actions retain their own established gates, including:
+默认部署下 Recovery Gate 关闭，因此审批不会直接产生 Kubernetes mutation。
 
-```text
-S_SENTINEL_RUNTIME_EXECUTION_ENABLED=true
-S_SENTINEL_RUNTIME_ACTION_APPROVED=true
-S_SENTINEL_ALLOW_RUNTIME_<ACTION>=true
-S_SENTINEL_RUNTIME_<ACTION>_EXECUTE=true
-```
+## Release 关联场景
 
-Approval and execute are deliberately separate steps. A command exit code does
-not itself mean recovery: inspect Runtime and SLO verification and the durable
-operation result.
-
-## Short release-correlated rollback scenario
-
-For a fresh failed Release, open the correlated Incident and follow **Open
-Release Control Room**. The existing Release Control Plane supplies Evidence,
-Policy, approval, and an eligible rollback recommendation. The same governed
-operation path executes the compatible Release Runtime Action only after every
-existing gate is satisfied. A stale failed Release is correlation context, not
-an automatic current-risk trigger.
+近期失败的 Release 可与 Incident 关联。若推荐为 `ROLLBACK_RELEASE`，它仍需经过既有 Policy、Approval、Gate、Runtime Action 与后置验证链；历史过期的失败 Release 只保留为关联信息，不单独构成当前风险。

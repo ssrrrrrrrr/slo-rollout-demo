@@ -1,62 +1,64 @@
 # S Sentinel
 
-S Sentinel 是一个面向 Kubernetes 服务的 SLO 驱动可靠性控制平台。
+S Sentinel 是面向 Kubernetes 服务、以 SLO 为驱动的云原生可靠性控制平台。
 
-平台持续观察 Service 的 SLO、Runtime 与 Release 状态，自动发现并关联可靠性 Incident；通过 LLM 辅助诊断、Runbook、Policy、人工审批和受控执行，对部分明确且安全的问题形成恢复闭环。
+它持续观察 Service 的 SLO、Runtime 与 Release 信号，发现并关联可靠性 Incident；再通过 LLM 辅助诊断、声明式 Runbook、Policy、人工审批与受控执行，为一部分明确问题形成安全、可验证的恢复闭环。
 
 ## 核心能力
 
-- Service-first：以 Service 聚合 SLO、Runtime、Release 与 Incident。
-- SLO：Availability、Error Rate、P95 Latency、Error Budget 与 Burn Rate。
-- Runtime：面向 Argo Rollouts 的 Kubernetes 运行状态快照。
-- Reliability Controller：持续 reconcile，创建、更新和关闭 durable Incident。
-- Incident：持久化生命周期、Timeline、Release correlation 与 LLM-assisted diagnosis。
-- Recovery：注册 Runbook、Recovery Plan、Policy、人工审批、Verification。
-- ControlledOperation：统一 Recovery 与 Release Runtime Action 的受控执行合同。
-- Durable Operation Ledger：持久化不可变执行 intent、执行状态与崩溃后的 inspect-before-retry 语义。
+- Service 视角的 SLO、Error Budget、Burn Rate 与 Kubernetes Runtime 可观测性。
+- Reliability Controller 持续生成并收敛可持久化的 Incident 生命周期与时间线。
+- LLM 辅助诊断：解释证据、给出诊断，并推荐已注册的 Runbook。
+- 声明式 Runbook、Recovery Plan、Policy 与人工审批组成恢复治理链。
+- ControlledOperation 与 SQLite Durable Operation Ledger 提供可审计的受控执行。
+- 内置 RESTART_WORKLOAD、SCALE_WORKLOAD，以及 Release Runtime Action：PAUSE、RESUME、PROMOTE、ABORT、ROLLBACK。
+- 执行后结合 Runtime 与 SLO 进行验证，而非以命令退出码作为恢复结论。
+
+## 工作流程
+
+`Observe → Detect → Correlate → Diagnose → Plan → Govern → Execute → Verify`
+
+`Reliability Controller → SLO / Runtime / Release → Incident → LLM Diagnosis → Runbook / RecoveryPlan → Policy / Approval → ControlledOperation → Durable Operation Ledger → Executor → Verification`
 
 ## 架构
 
-```text
-Observe → Detect → Correlate → Diagnose → Plan → Govern → Execute → Verify
+- Observation：Service、SLO、Runtime 与 Release 提供统一可靠性信号。
+- Incident：Controller、Detector、Lifecycle、SQLite Repository 与 Timeline 管理事件生命周期。
+- Reasoning：LLM Diagnosis、Runbook Matcher 与 Recovery Planner 将事件转为受限的恢复候选。
+- Control：ControlledOperation、Policy、Approval、Durable Ledger、Executor Registry 与 Verification 执行并审计受控动作。
 
-Service / SLO / Runtime / Release
-  → Incident Lifecycle
-  → Reliability Agent / Runbook
-  → Policy / Approval
-  → ControlledOperation / Durable Ledger
-  → Executor / Verification
-```
-
-Release Control Plane、Evidence、GitOps 与既有 Runtime Action 保持为兼容子系统；Release 是 Service Reliability 的一个信号来源，而不是平台唯一入口。
+完整分层和持久化语义见 [架构说明](docs/architecture.md)。
 
 ## 安全边界
 
-- Controller 只负责持续检测，不会自动审批或自动执行恢复。
-- Agent 只提出诊断与已注册 Runbook 候选，不能执行、审批、绕过 Policy 或调用 shell/kubectl。
-- Preview 永远只读；Approval 与 Execute 是两个独立步骤。
-- Recovery 与 Release Runtime Action 默认关闭，真实 mutation 必须满足 Policy、Approval、Preflight 和全部 Gate。
-- Operation Ledger 不可用时，真实执行 fail-closed；读取、诊断和预览能力保持可用。
-- 崩溃后的 EXECUTING Operation 只检查外部状态，不会自动重试 mutation。
+- Continuous Detection = YES；Automatic Remediation = NO。
+- 真实变更必须经过：`Runbook → Policy → Approval → Preflight → Gate → ControlledOperation → Executor → Verification`。
+- Recovery 默认关闭；Operation Ledger 不可用时，真实变更 fail closed。
+- LLM 只能辅助诊断和推荐已注册 Runbook；不能执行 shell/kubectl、不能审批、不能绕过 Policy，也不能自动恢复。
 
 ## 典型场景
 
-`demo-app` Runtime 变为 UNHEALTHY 后，Controller 创建 durable Incident；Agent 给出 `RUNTIME_FAILURE` 和已注册的 `restart-unhealthy-workload` 候选。操作者预览、审批并在全部 Gate 满足时执行 `RESTART_WORKLOAD`，随后由 Runtime/SLO Verification 推进 Incident 至 RECOVERING 或 RESOLVED。
+Runtime 故障且无新 Release 时，Controller 可创建 Incident；诊断推荐 `restart-unhealthy-workload` 后，用户先预览并审批，再执行受控的工作负载重启，最后由 Runtime/SLO 验证恢复。
+
+近期失败的 Release 也可作为可靠性信号关联 Incident，并在满足既有治理条件时走受控的 ROLLBACK Runtime Action。
 
 ## 技术栈
 
-Go Watcher、React/Vite Portal、Kubernetes/Argo Rollouts、Prometheus、SQLite、可选 Ollama，以及既有 Release/Evidence 脚本兼容层。
+Go watcher、React/Vite Web、Kubernetes/Argo Rollouts、Prometheus、SQLite、Ollama，以及 Kustomize + Argo CD GitOps 交付。
 
 ## 当前限制
 
-- 推荐单 watcher 部署；暂无 leader election 或 distributed lock。
-- 无自动恢复与自动重试。
-- Runtime Recovery 当前主要面向 Argo Rollouts。
-- SLO 依赖 Prometheus 指标可用性。
-- Release compatibility 仍保留 artifact/script 组件。
+- 推荐单 watcher 部署；尚无 leader election 或分布式锁。
+- SQLite 采用单 watcher 模型。
+- 不自动执行恢复，也不自动重试失败/未知操作。
+- Runtime 恢复主要面向 Argo Rollouts 工作负载。
+- SLO 数据依赖 Prometheus。
+- Release 兼容性 artifact 与脚本仍保留。
+- LLM 仅用于诊断与 Runbook 推荐。
 
-## 文档入口
+## 文档
 
-- [架构](docs/architecture.md)
+- [架构说明](docs/architecture.md)
 - [演示流程](docs/demo.md)
-- 本地验证：`cd watcher && go test ./...`、`cd web && pnpm run build`、`bash scripts/test-release-contracts.sh`
+- [Release / Evidence API 兼容说明](docs/release-portal-api.md)
+- [Runtime Action 合约](docs/runtime-action-contract-audit.md)

@@ -1,123 +1,69 @@
-# S Sentinel Architecture
+# S Sentinel 架构
 
-S Sentinel is an **SLO-driven Reliability Control Platform**. Its core loop is:
-
-```text
-Observe -> Detect -> Correlate -> Diagnose -> Plan -> Govern -> Execute -> Verify
-```
-
-The implementation deliberately keeps four planes. They are boundaries for
-responsibility, not separate services.
-
-## Observation Plane
-
-`Service` is the entry point. `ServiceService` loads configuration and exposes
-runtime, reliability, and delivery references. `SLOService` evaluates the
-referenced Prometheus SLO configuration; `RuntimeService` obtains an Argo
-Rollout and Pod snapshot; Service releases are read through the existing
-Evidence/Release compatibility path.
-
-Provider failure is represented as `UNKNOWN` rather than invented healthy data.
-This makes the Portal usable in local provider-unavailable mode without
-claiming an active Runtime watcher.
-
-## Incident Plane
-
-`ReliabilityController` periodically reconciles configured Services.
-`ReliabilityIncidentDetector` correlates current SLO, Runtime, and relevant
-release observations. `IncidentLifecycleService` serializes each Service
-reconcile, maps an active fingerprint to one active episode, and persists an
-Incident plus Timeline through `IncidentRepository`.
-
-`IncidentFingerprint` identifies an active episode; `IncidentID` identifies a
-durable incident record. Reconciliation updates the current active episode. If
-the same condition recurs after resolution, a new Incident is created. The
-durable lifecycle states are `ACTIVE`, `MITIGATING`, `RECOVERING`, and
-`RESOLVED`.
-
-The Controller performs continuous detection only. It does not invoke the
-Agent, approve, or execute recovery automatically.
-
-## Reasoning Plane
-
-`ReliabilityAgentService` reads an Incident context and produces a diagnosis
-plus candidate Runbooks. The provider may use Ollama, but invalid/unavailable
-output falls back to a deterministic provider. Candidate IDs are filtered to
-the registered Runbooks loaded by `RecoveryService`.
-
-The Agent does not execute actions, approve operations, bypass Policy, run a
-shell or `kubectl`, issue arbitrary commands, or enable automatic remediation.
+S Sentinel 将服务可靠性信号、事件判断与受控恢复分层组织。Service 是平台入口；Release 保留为可靠性信号和 Runtime Action 的兼容来源，而不是唯一根对象。
 
 ```text
-Agent proposes. Control Plane validates. Policy governs.
-Human approves. Executor executes. Verification confirms.
+Service / SLO / Runtime / Release
+              ↓
+Reliability Controller → Incident Lifecycle
+              ↓
+LLM Diagnosis → Runbook Matcher → Recovery Planner
+              ↓
+Policy / Approval → ControlledOperation → Durable Ledger → Executor → Verification
 ```
 
-`RunbookMatcher` and the Recovery planner convert an applicable registered
-Runbook into a Recovery Plan. They do not mutate Runtime state.
+## Observation
 
-## Control Plane
+Service 配置定义运行时引用、SLO 引用和交付策略。SLO 服务通过 Prometheus 计算 Availability、Error Rate、P95 Latency、Error Budget 与 Burn Rate；Runtime 服务读取 Kubernetes/Argo Rollouts 状态；Release Evidence 提供近期发布及其结果。
 
-`ControlledOperation` is the canonical controlled-execution contract used by
-both Recovery and Release-derived Remediation. It records source, subject,
-action, target, policy, approval checks, preflight, immutable execution intent,
-execution summary, verification, and an idempotency key.
+这些信号是观测输入。单次 Release Analysis 不是 Service 长期 SLO 状态的替代品。
 
-The durable sequence is:
+## Incident
 
-```text
-load/create ledger record
-  -> materialize immutable intent
-  -> refresh and validate policy, approval, and preflight
-  -> persist READY
-  -> persist EXECUTING
-  -> Executor Registry dispatch
-  -> persist executor result
-  -> verification
-```
+Reliability Controller 定期和按需为每个 Service 进行 reconcile。Detector 关联 SLO、Runtime 与具备运行相关性的近期 Release；Lifecycle 根据稳定 fingerprint 创建、更新、恢复或解决 Incident。
 
-The SQLite `OperationRepository` is authoritative for execution identity and
-lifecycle state. Process-local locks only serialize same-operation access; they
-do not replace durable identity.
+Incident 与时间线持久化在 SQLite。相同 Service 的一次 lifecycle transaction 在进程内串行化，避免 Controller 与手工 reconcile 竞争创建重复 episode。
 
-`RESTART_WORKLOAD` persists `restartAt`; `SCALE_WORKLOAD` persists
-`targetReplicas`; release actions persist their release/action/target identity.
-These values are not regenerated after restart.
+## Reasoning
 
-`OperationLifecycleService.ReconcileInFlight` is inspect-before-retry crash
-handling. For an interrupted `EXECUTING` operation it inspects external state:
-`APPLIED` continues the lifecycle, while `NOT_APPLIED` or `UNKNOWN` becomes
-`UNKNOWN`. It never executes an operation again automatically. This is durable
-and safe recovery semantics, not an exactly-once distributed execution claim.
+LLM Diagnosis 可读取 Incident 证据，解释可能原因，并在已注册 Runbook 中推荐候选。Runbook Matcher 和 Recovery Planner 决定候选动作与不可变目标。
 
-The `OperationExecutorRegistry` selects either the Kubernetes recovery adapter
-for bounded Runbook actions or the existing Release Runtime Action adapter for
-PAUSE, RESUME, PROMOTE, ABORT, and ROLLBACK. No incident-specific `kubectl`
-implementation or second executor is introduced.
+LLM 不拥有执行能力：不能调用 shell 或 kubectl，不能执行或审批操作，不能绕过 Policy，也不能自行触发恢复。LLM 不可用时使用确定性诊断/计划边界，系统仍保持安全。
 
-## Infrastructure and Compatibility
+## Control
 
-| Dependency | Role |
-|---|---|
-| Kubernetes / Argo Rollouts | Runtime observation and bounded recovery adapter |
-| Prometheus | SLO, Error Budget, and Burn Rate evaluation |
-| SQLite | Durable incident, timeline, approval, and operation state |
-| Ollama | Optional Reliability Agent provider |
-| Release artifacts and scripts | Existing Release Control Plane compatibility pipeline |
+真实恢复遵循固定顺序：
 
-The Release Control Plane remains responsible for Release Context, Evidence,
-Advisor, Policy, Approval, Runtime Actions, and GitOps-related workflows. It
-supplies a Release signal and compatible action artifacts to the Service
-Reliability platform; it is not removed or rewritten.
+`Runbook → Policy → Approval → Preflight → Gate → ControlledOperation → Executor → Verification`
 
-## Safety Boundaries
+- Policy 与 Approval 约束动作是否可以继续；Recovery 默认关闭。
+- ControlledOperation 是一次受控执行的规范对象，Operation ID 是规范执行身份。
+- Durable Operation Ledger 将操作及状态持久化到 SQLite；Ledger 不可用时真实变更 fail closed。
+- Executor Registry 仅选择已注册执行器：Kubernetes Recovery Executor 用于 RESTART_WORKLOAD/SCALE_WORKLOAD，Release Runtime Action Adapter 复用已有 PAUSE/RESUME/PROMOTE/ABORT/ROLLBACK 链。
+- Verification 读取后置 Runtime 和 SLO 状态；成功退出码不等同于已恢复。
 
-All real mutations are default-off. A Recovery Execute validates the applicable
-policy, durable human approval, preflight, `S_SENTINEL_RECOVERY_ENABLED`, and
-the action-specific gate before it reaches an executor. Release Runtime Actions
-also retain their established global, action-allow, approval, and execute gates.
-Preview never reaches an executor, and approval alone never executes an action.
+## 持久化与崩溃语义
 
-If the durable operation repository is unavailable, real Recovery and
-Remediation execution fail closed. Read-only Service, SLO, Runtime, Incident,
-Overview, Agent, and Preview paths remain available where their providers are.
+- Incident Lifecycle 和 Operation Ledger 均使用 SQLite 持久化。
+- RESTART_WORKLOAD 的 `restartAt`、SCALE_WORKLOAD 的 `targetReplicas` 在操作创建后不可变。
+- watcher 崩溃后，处于 `EXECUTING` 的操作只允许 Inspect；不会自动再次 Execute。
+- `FAILED` 与 `UNKNOWN` 操作不会自动重试。
+- 该语义不宣称 exactly-once；它提供可追溯、保守的崩溃恢复边界。
+
+## Release 兼容边界与 GitOps
+
+保留的 Release 能力包括：Release correlation、最小 Release Evidence、Runtime Action、PAUSE/RESUME/PROMOTE/ABORT/ROLLBACK，以及 Kustomize + Argo CD GitOps 交付。Release Advisor/Evidence compatibility 仍为兼容能力。
+
+已移除的旧链路包括 GitOps Proposal/Bundle/Handoff、GitOps Adapter、Real PR artifact workflow 与 Noop Execution plane；它们不是当前产品执行路径。
+
+当前 GitOps 交付链只有：
+
+`Config → Config Compiler → Kustomize → Git → Argo CD → Kubernetes / Argo Rollouts`
+
+## 基础设施
+
+- Kubernetes 与 Argo Rollouts：运行时状态和受控变更目标。
+- Prometheus：SLO 指标来源。
+- SQLite：Incident 与 Operation Ledger 的本地持久化。
+- Ollama：可选 LLM 诊断后端。
+- Kustomize 与 Argo CD：声明式配置交付。
