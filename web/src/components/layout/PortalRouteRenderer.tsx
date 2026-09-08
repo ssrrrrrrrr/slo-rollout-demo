@@ -8,16 +8,12 @@ import {
   getPortalRouteMeta,
   type PortalRoute,
 } from "@/components/layout/portalRoutes"
-import { AgentTracePanel } from "@/components/release/AgentTracePanel"
-import { ApprovalConsolePanel } from "@/components/release/ApprovalConsolePanel"
 import { ControlPlaneGraph } from "@/components/release/ControlPlaneGraph"
 import { ControlPlaneObjectCards } from "@/components/release/ControlPlaneObjectCards"
-import { EnvironmentAwarePortalPanel } from "@/components/release/EnvironmentAwarePortalPanel"
 import { EvidenceStorePanel } from "@/components/release/EvidenceStorePanel"
 import { PolicyExplanationPanel } from "@/components/release/PolicyExplanationPanel"
 import { ReleaseDetailWorkspace } from "@/components/release/ReleaseDetailWorkspace"
 import { ReleaseMetricGrid } from "@/components/release/ReleaseMetricGrid"
-import { SupplyChainGatePanel } from "@/components/release/SupplyChainGatePanel"
 import type { LatestReleaseResponse, ReleaseIndexItem } from "@/types/release"
 
 function resultTone(value: string): RouteHeaderBadgeTone {
@@ -186,58 +182,6 @@ export function PortalRouteRenderer({
           {pageHeader}
 
           <PolicyExplanationPanel
-            selected={selected}
-            evidenceQuery={evidenceQuery}
-            onTabChange={handleRouteAwareTabChange}
-          />
-        </>
-      )
-
-    case "Supply Chain":
-      return (
-        <>
-          {pageHeader}
-
-          <SupplyChainGatePanel
-            selected={selected}
-            evidenceQuery={evidenceQuery}
-            onTabChange={handleRouteAwareTabChange}
-          />
-        </>
-      )
-
-    case "Agent Trace":
-      return (
-        <>
-          {pageHeader}
-
-          <AgentTracePanel
-            selected={selected}
-            evidenceQuery={evidenceQuery}
-            onTabChange={handleRouteAwareTabChange}
-          />
-        </>
-      )
-
-    case "Approval":
-      return (
-        <>
-          {pageHeader}
-
-          <ApprovalConsolePanel
-            selected={selected}
-            evidenceQuery={evidenceQuery}
-            onTabChange={handleRouteAwareTabChange}
-          />
-        </>
-      )
-
-    case "Environment":
-      return (
-        <>
-          {pageHeader}
-
-          <EnvironmentAwarePortalPanel
             selected={selected}
             evidenceQuery={evidenceQuery}
             onTabChange={handleRouteAwareTabChange}

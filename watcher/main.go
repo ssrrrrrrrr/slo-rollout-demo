@@ -981,14 +981,17 @@ func main() {
 		log.Fatalf("invalid interval %q: %v", cfg.Interval, err)
 	}
 
-	kubeCfg, err := buildKubeConfig()
-	if err != nil {
-		log.Fatalf("failed to build kube config: %v", err)
-	}
-
-	client, err := dynamic.NewForConfig(kubeCfg)
-	if err != nil {
-		log.Fatalf("failed to create dynamic client: %v", err)
+	// The Portal and its read-only Service APIs deliberately remain available
+	// without Kubernetes. Runtime observations then report UNKNOWN through the
+	// existing provider boundary, while the watch loop and readiness stay off.
+	// This keeps local development from requiring a cluster and never turns a
+	// missing Kubernetes client into an execution capability.
+	var client dynamic.Interface
+	kubeCfg, kubeErr := buildKubeConfig()
+	if kubeErr != nil {
+		log.Printf("Kubernetes configuration unavailable; starting Portal without watch loop: %v", kubeErr)
+	} else if client, kubeErr = dynamic.NewForConfig(kubeCfg); kubeErr != nil {
+		log.Printf("Kubernetes client unavailable; starting Portal without watch loop: %v", kubeErr)
 	}
 
 	log.Printf(
@@ -1024,6 +1027,11 @@ func main() {
 	}
 
 	go startHealthServerForAPI(cfg.HealthAddr, api)
+	if client == nil {
+		log.Printf("Portal is running in provider-unavailable mode; /readyz remains unavailable until the watcher can connect to Kubernetes")
+		<-ctx.Done()
+		return
+	}
 
 	log.Printf("watcher is running in watch-only mode")
 	runWatchLoop(ctx, client, cfg, interval)

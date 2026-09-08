@@ -1,137 +1,62 @@
 # S Sentinel
 
-**S Sentinel is an SLO-driven Reliability Control Platform.** It continuously
-correlates service SLOs, Kubernetes runtime state, releases, and reliability
-incidents, then uses policy-governed, human-approved remediation to support
-safe reliability operations.
+S Sentinel 是一个面向 Kubernetes 服务的 SLO 驱动可靠性控制平台。
 
-It turns isolated operational signals into one control loop:
+平台持续观察 Service 的 SLO、Runtime 与 Release 状态，自动发现并关联可靠性 Incident；通过 LLM 辅助诊断、Runbook、Policy、人工审批和受控执行，对部分明确且安全的问题形成恢复闭环。
 
-```text
-Observe -> Detect -> Correlate -> Decide -> Govern -> Execute -> Verify
-```
+## 核心能力
 
-## Why S Sentinel
+- Service-first：以 Service 聚合 SLO、Runtime、Release 与 Incident。
+- SLO：Availability、Error Rate、P95 Latency、Error Budget 与 Burn Rate。
+- Runtime：面向 Argo Rollouts 的 Kubernetes 运行状态快照。
+- Reliability Controller：持续 reconcile，创建、更新和关闭 durable Incident。
+- Incident：持久化生命周期、Timeline、Release correlation 与 LLM-assisted diagnosis。
+- Recovery：注册 Runbook、Recovery Plan、Policy、人工审批、Verification。
+- ControlledOperation：统一 Recovery 与 Release Runtime Action 的受控执行合同。
+- Durable Operation Ledger：持久化不可变执行 intent、执行状态与崩溃后的 inspect-before-retry 语义。
 
-Prometheus, Kubernetes, Argo Rollouts, GitOps, policy decisions, and incident
-handling are often useful but disconnected. S Sentinel connects them around a
-Service-first reliability model. The existing Release Control Plane remains a
-subsystem: it supplies release evidence, advisor recommendations, policy,
-approval, execution, and audit context to the reliability platform.
-
-Unlike a generic Kubernetes dashboard or a rollout-only demo, S Sentinel
-answers: *is this Service reliable now, what release is relevant, and what
-controlled action is safe to consider?*
-
-## Core Model
+## 架构
 
 ```text
-Service -> SLO
-        -> Runtime
-        -> Releases
-        -> Incidents
+Observe → Detect → Correlate → Diagnose → Plan → Govern → Execute → Verify
 
-Incident -> Recommendation -> Policy -> Approval
-         -> Controlled Remediation -> Verification
+Service / SLO / Runtime / Release
+  → Incident Lifecycle
+  → Reliability Agent / Runbook
+  → Policy / Approval
+  → ControlledOperation / Durable Ledger
+  → Executor / Verification
 ```
 
-## Architecture
+Release Control Plane、Evidence、GitOps 与既有 Runtime Action 保持为兼容子系统；Release 是 Service Reliability 的一个信号来源，而不是平台唯一入口。
 
-```mermaid
-flowchart LR
-  Portal[Portal] --> Watcher[Watcher / Control Plane]
-  Watcher --> Service[Service Domain]
-  Service --> SLO[SLO Provider]
-  Service --> Runtime[Kubernetes Runtime Provider]
-  Service --> Incident[Incident Detector]
-  Incident --> Overview[Overview Aggregator]
-  Watcher <--> Evidence[Evidence Repository]
-  Evidence <--> Release[Release Control Plane]
-  Release --> Policy[Policy and Approval]
-  Policy --> Execute[Controlled Runtime Action]
-  SLO --> Prometheus[Prometheus]
-  Runtime --> Argo[Argo Rollouts / Kubernetes]
-  Release --> GitOps[GitOps]
-  Execute --> Argo
-```
+## 安全边界
 
-## Key Capabilities
+- Controller 只负责持续检测，不会自动审批或自动执行恢复。
+- Agent 只提出诊断与已注册 Runbook 候选，不能执行、审批、绕过 Policy 或调用 shell/kubectl。
+- Preview 永远只读；Approval 与 Execute 是两个独立步骤。
+- Recovery 与 Release Runtime Action 默认关闭，真实 mutation 必须满足 Policy、Approval、Preflight 和全部 Gate。
+- Operation Ledger 不可用时，真实执行 fail-closed；读取、诊断和预览能力保持可用。
+- 崩溃后的 EXECUTING Operation 只检查外部状态，不会自动重试 mutation。
 
-- Service Catalog with runtime, SLO, and delivery references
-- SLO status, error budget, and 1h / 6h / 24h burn rates
-- Argo Rollout runtime visibility
-- Real-time reliability incident detection and release correlation
-- Fleet reliability overview
-- Release evidence, advisor, policy, approval, and GitOps compatibility plane
-- Policy-controlled remediation and post-action verification
+## 典型场景
 
-## Safety Model
+`demo-app` Runtime 变为 UNHEALTHY 后，Controller 创建 durable Incident；Agent 给出 `RUNTIME_FAILURE` 和已注册的 `restart-unhealthy-workload` 候选。操作者预览、审批并在全部 Gate 满足时执行 `RESTART_WORKLOAD`，随后由 Runtime/SLO Verification 推进 Incident 至 RECOVERING 或 RESOLVED。
 
-Runtime mutations are disabled by default. Incident detection never triggers
-an automatic rollback. A real Runtime Action requires a matching release
-recommendation, policy allowance, approval, an existing preflight, global and
-action gates, an explicit execute switch, and post-action verification. See
-[docs/architecture.md](docs/architecture.md) for the safety boundary.
+## 技术栈
 
-## Demo Flow
+Go Watcher、React/Vite Portal、Kubernetes/Argo Rollouts、Prometheus、SQLite、可选 Ollama，以及既有 Release/Evidence 脚本兼容层。
 
-`demo-app` can demonstrate a healthy Service, SLO degradation, incident/release
-correlation, and a blocked-by-default remediation preview. Real action demos
-are opt-in and require every safety gate. See [docs/demo.md](docs/demo.md).
+## 当前限制
 
-## Repository Layout
+- 推荐单 watcher 部署；暂无 leader election 或 distributed lock。
+- 无自动恢复与自动重试。
+- Runtime Recovery 当前主要面向 Argo Rollouts。
+- SLO 依赖 Prometheus 指标可用性。
+- Release compatibility 仍保留 artifact/script 组件。
 
-| Path | Purpose |
-|---|---|
-| `watcher/` | Control Plane, Service domains, Portal API |
-| `web/` | S Sentinel Portal |
-| `configs/` | Service, SLO, strategy, and environment configuration |
-| `schemas/` | Release and control-plane contracts |
-| `scripts/` | Existing Release, Evidence, policy, and runtime pipelines |
-| `deploy/` | Kubernetes, Argo Rollouts, and monitoring manifests |
-| `demo-app/` | Demonstration workload |
+## 文档入口
 
-## Quick Start
-
-Required for local development: Go, Node.js with pnpm, Python 3, and Git Bash
-or another Bash environment. Kubernetes, Argo Rollouts, and Prometheus are
-optional for API/UI development; their live states surface as `UNKNOWN` when
-unavailable. Ollama is only needed for advisor flows.
-
-```bash
-cd watcher && go test ./...
-cd ../web && pnpm install --frozen-lockfile && pnpm run build
-cd .. && bash scripts/test-release-contracts.sh
-```
-
-Run the watcher with a configuration such as `watcher/config.k8s.yaml` only in
-an environment that has Kubernetes access. Use [docs/demo.md](docs/demo.md)
-for the complete demonstration sequence.
-
-## Core APIs
-
-```text
-GET /api/v1/overview
-GET /api/v1/services
-GET /api/v1/services/{name}
-GET /api/v1/services/{name}/slo
-GET /api/v1/services/{name}/runtime
-GET /api/v1/services/{name}/incidents
-GET /api/v1/incidents
-GET /api/v1/incidents/{id}
-GET /api/v1/incidents/{id}/remediation
-```
-
-The existing `/api/releases` and `/api/evidence` families remain the Release
-Control Plane and Evidence entry points. Internal GitOps artifact endpoints are
-deliberately not the primary product API.
-
-## Current Scope and Limitations
-
-- Services are configuration-driven; there is no Service database.
-- Runtime visibility currently targets Argo Rollouts.
-- Incidents are calculated in real time and have no historical persistence.
-- Remediation idempotency is watcher-process-local.
-- SLO status is queried from Prometheus at evaluation time.
-- The Release / GitOps compatibility pipeline still has detailed artifacts.
-- Release Evidence compatibility remains in place for existing consumers.
+- [架构](docs/architecture.md)
+- [演示流程](docs/demo.md)
+- 本地验证：`cd watcher && go test ./...`、`cd web && pnpm run build`、`bash scripts/test-release-contracts.sh`

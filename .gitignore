@@ -26,6 +26,13 @@ docs/release-reports/
 watcher/release-rollout-watcher
 watcher/config.yaml
 
+# local durable stores and frontend build artifacts
+*.db
+*.db-shm
+*.db-wal
+web/node_modules/
+web/dist/
+
 # local editor/system files
 *.swp
 .DS_Store

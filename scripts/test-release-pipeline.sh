@@ -394,7 +394,6 @@ main() {
   bash -n scripts/test-packaging-boundary.sh
   bash -n scripts/test-evidence-environment-integration.sh
   bash -n scripts/test-environment-selection.sh
-  bash -n scripts/test-stage34-multi-env-packaging.sh
 
   sleep 1
   run_advisor_case "pass" "$PASS_CONTEXT"
@@ -442,8 +441,6 @@ main() {
   ./scripts/test-packaging-boundary.sh
   ./scripts/test-evidence-environment-integration.sh
   ./scripts/test-environment-selection.sh "$TEST_TMP/environment-selection"
-  ./scripts/test-stage34-multi-env-packaging.sh "$TEST_TMP/stage34-multi-env-packaging"
-
   log "ALL OFFLINE RELEASE PIPELINE TESTS PASSED"
 }
 

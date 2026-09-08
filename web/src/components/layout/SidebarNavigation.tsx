@@ -1,17 +1,14 @@
 ﻿import {
   Activity,
   CheckCircle2,
-  ClipboardCheck,
   Database,
   GitBranch,
-  LockKeyhole,
   Network,
   ShieldCheck,
   Siren,
 } from "lucide-react"
 import {
   platformRoutes,
-  workspaceRoutes,
   type PortalRoute,
 } from "@/components/layout/portalRoutes"
 
@@ -22,10 +19,6 @@ const routeIcon: Record<PortalRoute, typeof ShieldCheck> = {
   Incidents: Siren,
   Evidence: Database,
   Policy: ShieldCheck,
-  "Supply Chain": LockKeyhole,
-  "Agent Trace": Activity,
-  Approval: ClipboardCheck,
-  Environment: Network,
 }
 
 function RouteButton({
@@ -33,7 +26,7 @@ function RouteButton({
   activeRoute,
   onRouteChange,
 }: {
-  route: (typeof platformRoutes | typeof workspaceRoutes)[number]
+  route: (typeof platformRoutes)[number]
   activeRoute: PortalRoute
   onRouteChange: (route: PortalRoute) => void
 }) {
@@ -119,32 +112,15 @@ export function SidebarNavigation({
           </div>
         </div>
 
-        <div>
-          <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-            Workspaces
-          </p>
-
-          <div className="mt-2 space-y-1">
-            {workspaceRoutes.map((route) => (
-              <RouteButton
-                key={route.id}
-                route={route}
-                activeRoute={activeRoute}
-                onRouteChange={onRouteChange}
-              />
-            ))}
-          </div>
-        </div>
-
         <div className="mt-auto">
           <div className="rounded-xl border border-[#1f2b3d] bg-[#0b121d] px-3 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-slate-300">
-                  Read-only boundary
+                  Governed recovery
                 </p>
                 <p className="mt-1 text-[11px] leading-4 text-slate-600">
-                  Advisor cannot execute actions directly.
+                  Agent proposes; policy, approval, and gates control execution.
                 </p>
               </div>
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />

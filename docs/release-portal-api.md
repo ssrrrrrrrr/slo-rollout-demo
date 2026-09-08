@@ -460,14 +460,14 @@ Stage 37 新增只读 EvidenceStore 查询入口，不替换原有 /api/releases
 
 阶段级验收脚本：
 
-- scripts/test-stage37-evidence-store.sh
+- scripts/test-evidence-store-portal-integration.sh
 
 
 ### 5.2 Stage43 Evidence API 兼容性验收
 
 Stage43 Evidence API 的轻量验收脚本：
 
-    scripts/test-stage43-evidence-api.sh
+    scripts/test-evidence-api-compatibility.sh
 
 该脚本覆盖：
 

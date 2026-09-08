@@ -1,22 +1,14 @@
-﻿import type { UseQueryResult } from "@tanstack/react-query"
-import { Activity, LockKeyhole } from "lucide-react"
+import { Activity, ShieldCheck } from "lucide-react"
+import type { UseQueryResult } from "@tanstack/react-query"
 import type { ReleaseResourceContent } from "@/api/releaseResources"
 import { isMarkdownContent } from "@/api/releaseResources"
 import { RawResourceViewer } from "@/components/common/RawResourceViewer"
 import {
-  ActionPlanProductView,
-  AIAdviceProductView,
-  ContextProductView,
   EvidenceProductView,
-  IntelligenceProductView,
   OverviewProductView,
-  RCAProductView,
-  RunbookProductView,
   TimelineProductView,
 } from "@/components/product-views/ProductViews"
 import type { LatestReleaseResponse, ReleaseIndexItem } from "@/types/release"
-import { GroupedReleaseResourcePanel } from "./GroupedReleaseResourcePanel"
-import { SafetyPanel } from "./SafetyPanel"
 
 export function ReleaseResourcePanel({
   activeTab,
@@ -31,233 +23,26 @@ export function ReleaseResourcePanel({
   resourceKind: string
   resourceQuery: UseQueryResult<ReleaseResourceContent, Error>
 }) {
-  if (["Runtime Actions", "GitOps", "Advisor", "Docs"].includes(activeTab)) {
-    return (
-      <GroupedReleaseResourcePanel
-        activeTab={activeTab}
-        selected={selected}
-        latest={latest}
-      />
-    )
-  }
-
   return (
     <div className="space-y-5">
-      {activeTab === "Action Plan" ? (
+      {activeTab === "Runtime Action" ? (
         <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
           <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            Action Plan 安全边界
+            <ShieldCheck className="h-4 w-4 text-amber-300" />
+            Runtime Action 结果
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前系统处于只读观察模式。Release Portal 返回的 Action Plan 仅用于辅助判断，不会修改 Kubernetes 资源。
+            展示已有 Runtime Action 的执行结果与验证信息。真实 mutation 仍需通过既有 Policy、Approval 和执行 Gate。
           </p>
         </div>
       ) : null}
-
-      {activeTab === "Execution" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            Execution Result 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只生成 Noop Executor 的执行证据，不会修改 Kubernetes、GitOps 或 rollout 状态。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Proposal" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Proposal 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只生成 review-only GitOps patch proposal，用来说明后续 PR / patch adapter 应该提交什么，不会修改仓库或创建 PR。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Bundle" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Bundle 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只整理 branch、commit message 和 PR 文案，不会提交 commit、push 分支或创建 Pull Request。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Handoff" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Handoff 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只落地 handoff 文件和审查材料，不会写 Git 仓库、不会 push 分支，也不会调用外部 PR 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Adapter" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Adapter 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只生成 adapter-ready request，用来约束未来的 GitOps adapter 输入；它不会调用外部 Git 平台，也不会真的执行交付。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Delivery" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Delivery 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只生成本地 delivery receipt，用来证明 adapter 已经接收并整理交付结果；它不会 commit、push、创建 PR，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Workspace" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Workspace 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只准备本地 pickup workspace 和复制好的 handoff 文件，方便人工接手或后续 adapter 消费；它不会写仓库、不会 push，也不会创建 Pull Request。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Run" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Run 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只验证本地 handoff workspace 是否完整，并生成 readiness receipt；它不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Pickup" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Pickup 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只把 run 结果整理成 pickup 状态和下一步 checkpoint，方便人工接手或后续 adapter 跟进；它不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Pickup Ack" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Pickup Ack 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只记录 pickup 是否进入等待接手、已接手或被退回的本地状态；它不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Handoff State" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Handoff State 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只记录本地交接流程的推进状态和下一步 checkpoint；它不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Pickup Event" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Pickup Event 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只记录本地控制面当前在等待什么 pickup 动作，以及允许哪些后续事件；它不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Pickup Transition" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Pickup Transition 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只在本地控制面推演 pickup 响应后的状态迁移结果。默认仍然是等待本地响应，不会自动替人做 accept / return，也不会 commit、push、创建 Pull Request。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Handoff Prep" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Handoff Prep 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只在本地控制面整理 pickup accepted 之后的 handoff 准备状态与检查项，不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "GitOps Handoff Progress" ? (
-        <div className="rounded-xl border border-[#35517a] bg-[#101a29] p-4">
-          <div className="flex items-center gap-2 font-semibold text-slate-100">
-            <LockKeyhole className="h-4 w-4 text-amber-300" />
-            GitOps Handoff Progress 边界
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前阶段只在本地控制面记录 handoff 是否开始、完成或退回返工，不会 commit、push、创建 Pull Request，也不会调用外部 Git 平台。
-          </p>
-        </div>
-      ) : null}
-
-      {activeTab === "Action Plan" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "Execution" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Proposal" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Bundle" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Handoff" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Adapter" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Delivery" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Workspace" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Run" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Pickup" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Pickup Ack" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Handoff State" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Pickup Event" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Pickup Transition" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Handoff Prep" ? <SafetyPanel latest={latest} /> : null}
-      {activeTab === "GitOps Handoff Progress" ? <SafetyPanel latest={latest} /> : null}
 
       <div className="rounded-xl border border-[#1f2b3d] bg-[#0b121d] p-5">
         <div className="flex flex-col gap-3 border-b border-[#1a2535] pb-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-2 font-semibold text-slate-100">
               <Activity className="h-4 w-4 text-[#5d8fd8]" />
-              {activeTab === "Advisor Trace" ? "Advisor Trace" : activeTab}
+              {activeTab}
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
               正在读取 <span className="font-mono text-slate-200">/api/releases/{selected.releaseId}/{resourceKind}</span>
@@ -277,10 +62,6 @@ export function ReleaseResourcePanel({
           <div className="mt-4 rounded-lg border border-[#1f2b3d] bg-[#0f1724] p-4 text-sm text-slate-400">
             正在加载资源内容...
           </div>
-        ) : resourceQuery.isError && activeTab !== "Timeline" ? (
-          <div className="mt-4 rounded-lg border border-rose-900/45 bg-rose-950/20 p-4 text-sm text-rose-200">
-            资源读取失败：{resourceQuery.error instanceof Error ? resourceQuery.error.message : "unknown error"}
-          </div>
         ) : resourceQuery.isError && activeTab === "Timeline" ? (
           <div className="mt-4 space-y-5">
             <div className="rounded-lg border border-amber-900/45 bg-amber-950/20 p-4 text-sm text-amber-200">
@@ -289,46 +70,20 @@ export function ReleaseResourcePanel({
             </div>
             <TimelineProductView selected={selected} />
           </div>
+        ) : resourceQuery.isError ? (
+          <div className="mt-4 rounded-lg border border-rose-900/45 bg-rose-950/20 p-4 text-sm text-rose-200">
+            资源读取失败：{resourceQuery.error instanceof Error ? resourceQuery.error.message : "unknown error"}
+          </div>
         ) : resourceQuery.data ? (
           <div className="mt-4 space-y-5">
             {activeTab === "Timeline" ? (
               <TimelineProductView selected={selected} body={resourceQuery.data.body} />
             ) : null}
-
-            {activeTab === "Action Plan" && !isMarkdownContent(resourceQuery.data.contentType) ? (
-              <ActionPlanProductView body={resourceQuery.data.body} />
-            ) : null}
-
             {activeTab === "Evidence" && !isMarkdownContent(resourceQuery.data.contentType) ? (
               <EvidenceProductView body={resourceQuery.data.body} />
             ) : null}
-
-            {activeTab === "Intelligence" && !isMarkdownContent(resourceQuery.data.contentType) ? (
-              <IntelligenceProductView body={resourceQuery.data.body} />
-            ) : null}
-
-            {activeTab === "Advisor Trace" && isMarkdownContent(resourceQuery.data.contentType) ? (
-              <AIAdviceProductView body={resourceQuery.data.body} />
-            ) : null}
-
-            {activeTab === "Runbook" && isMarkdownContent(resourceQuery.data.contentType) ? (
-              <RunbookProductView body={resourceQuery.data.body} />
-            ) : null}
-
-            {activeTab === "RCA" && isMarkdownContent(resourceQuery.data.contentType) ? (
-              <RCAProductView body={resourceQuery.data.body} />
-            ) : null}
-
-            {activeTab === "Context" && !isMarkdownContent(resourceQuery.data.contentType) ? (
-              <ContextProductView body={resourceQuery.data.body} />
-            ) : null}
-
             {activeTab === "概览" && isMarkdownContent(resourceQuery.data.contentType) ? (
-              <OverviewProductView
-                body={resourceQuery.data.body}
-                selected={selected}
-                latest={latest}
-              />
+              <OverviewProductView body={resourceQuery.data.body} selected={selected} latest={latest} />
             ) : null}
 
             <div>
@@ -338,10 +93,7 @@ export function ReleaseResourcePanel({
                   Audit View
                 </span>
               </div>
-              <RawResourceViewer
-                contentType={resourceQuery.data.contentType}
-                body={resourceQuery.data.body}
-              />
+              <RawResourceViewer contentType={resourceQuery.data.contentType} body={resourceQuery.data.body} />
             </div>
           </div>
         ) : (
@@ -353,4 +105,3 @@ export function ReleaseResourcePanel({
     </div>
   )
 }
-
